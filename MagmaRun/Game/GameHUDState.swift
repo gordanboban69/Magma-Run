@@ -10,6 +10,17 @@ struct GameHUDState: Equatable, Sendable {
     var shieldCharge: Double = 0
     var elapsed: TimeInterval = 0
 
+    /// Near-miss rage in `0...1`; a full bar discharges as a shockwave.
+    var rage: Double = 0
+    /// Current ember streak toward the next overdrive.
+    var combo = 0
+    var isOverdrive = false
+    var overdriveRemaining: TimeInterval = 0
+    var mood: VolcanoMood = .steady
+    var upcomingMood: VolcanoMood?
+    var moodRemaining: TimeInterval = 0
+    var lavaWarning = false
+
     init(loadout: HeroLoadout) {
         hearts = loadout.maxHearts
         maxHearts = loadout.maxHearts
@@ -25,6 +36,14 @@ struct GameHUDState: Equatable, Sendable {
         hasShield = session.hasShield
         shieldCharge = session.shieldCharge
         elapsed = session.elapsed
+        rage = session.rage
+        combo = session.combo % RunSession.overdriveComboLength
+        isOverdrive = session.isOverdrive
+        overdriveRemaining = session.overdriveRemaining
+        mood = session.mood
+        upcomingMood = session.upcomingMood
+        moodRemaining = session.moodRemaining
+        lavaWarning = session.lavaRiver?.phase == .warning
     }
 }
 
@@ -34,4 +53,8 @@ enum GameEvent: Equatable, Sendable {
     case shieldAbsorbed
     case damaged
     case defeated
+    case shockwave
+    case overdriveStarted
+    case moodChanged(VolcanoMood)
+    case lavaStarted
 }

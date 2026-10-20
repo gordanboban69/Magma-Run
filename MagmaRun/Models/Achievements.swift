@@ -7,6 +7,8 @@ struct PlayerStats: Equatable, Sendable {
     var totalEmbersCollected = 0
     var totalBouldersDodged = 0
     var longestSurvival: TimeInterval = 0
+    var totalShockwaves = 0
+    var totalOverdrives = 0
     var unlockedHeroCount = 1
     var maxedUpgradeCount = 0
 }
@@ -48,6 +50,10 @@ enum AchievementCatalog {
                    systemImage: "sparkles", target: 500) { Double($0.totalEmbersCollected) },
         Definition(id: "runs25", title: "Mountain Regular", detail: "Finish 25 runs.",
                    systemImage: "repeat", target: 25) { Double($0.totalRuns) },
+        Definition(id: "shockwaves10", title: "Earthshaker", detail: "Unleash 10 rage shockwaves.",
+                   systemImage: "dot.radiowaves.left.and.right", target: 10) { Double($0.totalShockwaves) },
+        Definition(id: "overdrives5", title: "Molten Heart", detail: "Enter overdrive 5 times.",
+                   systemImage: "bolt.heart.fill", target: 5) { Double($0.totalOverdrives) },
         Definition(id: "heroes3", title: "Collector", detail: "Unlock 3 heroes.",
                    systemImage: "person.3.fill", target: 3) { Double($0.unlockedHeroCount) },
         Definition(id: "maxUpgrade", title: "Master Smith", detail: "Max out any upgrade.",

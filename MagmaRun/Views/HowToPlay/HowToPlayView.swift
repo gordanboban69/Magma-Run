@@ -18,7 +18,11 @@ struct HowToPlayView: View {
         Step(id: 1, title: "Dodge the boulders", detail: "Rocks erupt from the crater and rain from the sky. Each hit costs a heart.", systemImage: "circle.hexagongrid.fill", tint: Theme.Colors.ash),
         Step(id: 2, title: "Collect embers", detail: "Glowing embers are your currency. Grab them mid-run to spend later.", systemImage: "flame.fill", tint: Theme.Colors.ember),
         Step(id: 3, title: "Forge upgrades", detail: "Spend embers on speed, hearts, a recharging shield, a magnet and fortune.", systemImage: "hammer.fill", tint: Theme.Colors.lava),
-        Step(id: 4, title: "Survive longer", detail: "The eruption grows fiercer every second. Score climbs faster the longer you last.", systemImage: "chart.line.uptrend.xyaxis", tint: Theme.Colors.success)
+        Step(id: 4, title: "Build rage with near misses", detail: "Let boulders graze past you. Five close calls fill the rage bar and unleash a shockwave that shatters every rock nearby.", systemImage: "dot.radiowaves.left.and.right", tint: Color(red: 1.0, green: 0.45, blue: 0.2)),
+        Step(id: 5, title: "Escape the lava rivers", detail: "Cracks start glowing on the ground: that strip floods with lava moments later. Standing in it costs a heart.", systemImage: "exclamationmark.triangle.fill", tint: Theme.Colors.lava),
+        Step(id: 6, title: "Chain embers for overdrive", detail: "Six embers in a row without taking damage turn you molten for five seconds: boulders shatter on contact and embers count double.", systemImage: "bolt.fill", tint: Theme.Colors.ember),
+        Step(id: 7, title: "Read the volcano's mood", detail: "A banner warns before each phase. Fury hurls aimed rocks, Ash Rain drops them from the sky, Ember Shower is your harvest window.", systemImage: "mountain.2.fill", tint: Color(red: 0.75, green: 0.62, blue: 0.70)),
+        Step(id: 8, title: "Survive longer", detail: "The eruption grows fiercer every second. Score climbs faster the longer you last.", systemImage: "chart.line.uptrend.xyaxis", tint: Theme.Colors.success)
     ]
 
     var body: some View {
@@ -29,7 +33,7 @@ struct HowToPlayView: View {
                         Text("Welcome to the mountain")
                             .font(.display(26))
                             .foregroundStyle(Theme.Colors.textPrimary)
-                        Text("Five things to know before your first run.")
+                        Text("Nine things to know before your first run.")
                             .font(.system(size: 14, weight: .medium, design: .rounded))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }

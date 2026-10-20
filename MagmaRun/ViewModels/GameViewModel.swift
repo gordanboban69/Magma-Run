@@ -98,6 +98,7 @@ final class GameViewModel {
     func pause() {
         guard phase == .running else { return }
         scene?.steeringDirection = 0
+        scene?.setSuspended(true)
         withAnimation(.easeOut(duration: 0.2)) {
             phase = .paused
         }
@@ -106,6 +107,7 @@ final class GameViewModel {
 
     func resume() {
         guard phase == .paused else { return }
+        scene?.setSuspended(false)
         withAnimation(.easeOut(duration: 0.2)) {
             phase = .running
         }
@@ -167,6 +169,12 @@ extension GameViewModel: VolcanoSceneDelegate {
         case .defeated:
             damageFlashCount += 1
             haptics.notify(.error)
+        case .shockwave:
+            haptics.impact(.heavy)
+        case .overdriveStarted:
+            haptics.notify(.success)
+        case .moodChanged, .lavaStarted:
+            haptics.impact(.medium)
         }
     }
 

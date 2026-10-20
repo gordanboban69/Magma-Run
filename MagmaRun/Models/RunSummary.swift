@@ -7,6 +7,8 @@ struct RunSummary: Equatable, Sendable {
     var duration: TimeInterval
     var bouldersDodged: Int
     var heroID: String
+    var shockwaves: Int = 0
+    var overdrives: Int = 0
 }
 
 /// The outcome of persisting a run, including comparison with the previous best.

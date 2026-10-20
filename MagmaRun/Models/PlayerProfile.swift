@@ -10,6 +10,8 @@ final class PlayerProfile {
     var totalEmbersCollected: Int
     var totalBouldersDodged: Int
     var longestSurvival: TimeInterval
+    var totalShockwaves: Int = 0
+    var totalOverdrives: Int = 0
 
     var agilityLevel: Int
     var vitalityLevel: Int
@@ -103,6 +105,8 @@ final class PlayerProfile {
             totalEmbersCollected: totalEmbersCollected,
             totalBouldersDodged: totalBouldersDodged,
             longestSurvival: longestSurvival,
+            totalShockwaves: totalShockwaves,
+            totalOverdrives: totalOverdrives,
             unlockedHeroCount: HeroSkin.allCases.filter { isUnlocked($0) }.count,
             maxedUpgradeCount: UpgradeKind.allCases.filter { level(for: $0) >= $0.maxLevel }.count
         )

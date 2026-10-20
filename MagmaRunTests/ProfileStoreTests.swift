@@ -161,7 +161,7 @@ struct ProfileStoreTests {
 struct AchievementTests {
     @Test func emptyStatsUnlockNothing() {
         let achievements = AchievementCatalog.evaluate(PlayerStats())
-        #expect(achievements.count == 9)
+        #expect(achievements.count == 11)
         #expect(achievements.allSatisfy { !$0.isUnlocked })
         // The starter hero is always owned, so "Collector" starts at one third.
         #expect(achievements.filter { $0.id != "heroes3" }.allSatisfy { $0.progress == 0 })

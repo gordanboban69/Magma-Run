@@ -26,6 +26,22 @@ final class MagmaRunUITests: XCTestCase {
         XCTAssertTrue(element(identifier).waitForExistence(timeout: timeout), "Expected \(identifier) to appear", file: file, line: line)
     }
 
+    /// Waits until the "Starting in N" overlay has disappeared, i.e. the run is live.
+    private func waitForCountdownToFinish(file: StaticString = #filePath, line: UInt = #line) {
+        let countdown = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Starting in")).firstMatch
+        XCTAssertTrue(countdown.waitForExistence(timeout: 5), "Countdown never started", file: file, line: line)
+        XCTAssertTrue(countdown.waitForNonExistence(timeout: 8), "Countdown never finished", file: file, line: line)
+        // Let the HUD fade-in complete before interacting.
+        usleep(400_000)
+    }
+
+    /// Taps the pause button by coordinate: the animated scene underneath makes
+    /// XCUITest's hittability snapshots slow and occasionally stale.
+    private func tapPause(_ pause: XCUIElement) {
+        XCTAssertTrue(pause.waitForExistence(timeout: 3))
+        pause.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    }
+
     private func goBack() {
         let back = app.navigationBars.buttons.element(boundBy: 0)
         if back.waitForExistence(timeout: 3) {
@@ -164,17 +180,22 @@ final class MagmaRunUITests: XCTestCase {
         XCTAssertTrue(start.waitForExistence(timeout: 5))
         start.tap()
 
-        // The countdown lasts just over two seconds before the HUD becomes interactive.
+        // The 3-2-1 countdown must finish before the HUD becomes interactive.
+        waitForCountdownToFinish()
         let pause = element("game.pause")
-        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: pause)
-        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 10), .completed, "Pause button never became tappable")
-        pause.tap()
-
+        tapPause(pause)
+        attachScreenshot(named: "after first pause tap")
         waitFor("game.pausedOverlay")
+
+        // While paused the clock must stand still.
+        let scoreBefore = element("game.score").label
+        sleep(2)
+        XCTAssertEqual(element("game.score").label, scoreBefore, "Score advanced while paused")
+
         element("game.resume").tap()
         XCTAssertTrue(element("game.pausedOverlay").waitForNonExistence(timeout: 3))
 
-        pause.tap()
+        tapPause(pause)
         waitFor("game.pausedOverlay")
         element("game.quit").tap()
 
@@ -210,11 +231,9 @@ final class MagmaRunUITests: XCTestCase {
         attachScreenshot(named: "iPad landscape game ready")
         start.tap()
 
-        let pause = element("game.pause")
-        let hittable = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: pause)
-        XCTAssertEqual(XCTWaiter().wait(for: [hittable], timeout: 10), .completed)
+        waitForCountdownToFinish()
         attachScreenshot(named: "iPad landscape game running")
-        pause.tap()
+        tapPause(element("game.pause"))
         waitFor("game.pausedOverlay")
         element("game.quit").tap()
         waitFor("home.screen")

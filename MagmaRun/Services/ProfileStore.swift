@@ -115,6 +115,8 @@ final class ProfileStore {
         profile.totalEmbersCollected += summary.embersCollected
         profile.totalBouldersDodged += summary.bouldersDodged
         profile.longestSurvival = max(profile.longestSurvival, summary.duration)
+        profile.totalShockwaves += summary.shockwaves
+        profile.totalOverdrives += summary.overdrives
         if isNewBest {
             profile.bestScore = summary.score
         }

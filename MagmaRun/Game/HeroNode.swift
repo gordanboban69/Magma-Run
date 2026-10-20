@@ -131,6 +131,46 @@ final class HeroNode: SKNode {
         }
     }
 
+    private var isOverdriveVisible = false
+
+    /// Turns the hero molten while overdrive is active.
+    func setOverdrive(_ active: Bool) {
+        guard active != isOverdriveVisible else { return }
+        isOverdriveVisible = active
+        if active {
+            let hot = UIColor(red: 1.0, green: 0.55, blue: 0.15, alpha: 1)
+            body.fillColor = hot
+            head.fillColor = hot
+            body.glowWidth = 6
+            head.glowWidth = 6
+            trail.particleBirthRate = 160
+            trail.particleColor = UIColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1)
+            let pulse = SKAction.sequence([.scale(to: 1.12, duration: 0.18), .scale(to: 1.0, duration: 0.18)])
+            run(.repeatForever(pulse), withKey: "overdrivePulse")
+        } else {
+            body.fillColor = primaryColor
+            head.fillColor = primaryColor
+            body.glowWidth = 0
+            head.glowWidth = 0
+            trail.particleColor = glowColor
+            removeAction(forKey: "overdrivePulse")
+            run(.scale(to: 1.0, duration: 0.15))
+        }
+    }
+
+    /// Expanding ring used when rage discharges as a shockwave.
+    func playShockwave(radius: CGFloat) {
+        let ring = SKShapeNode(circleOfRadius: 30)
+        ring.strokeColor = UIColor(red: 1.0, green: 0.7, blue: 0.25, alpha: 1)
+        ring.lineWidth = 6
+        ring.glowWidth = 14
+        ring.zPosition = 3
+        addChild(ring)
+        let scale = SKAction.scale(to: radius / 30, duration: 0.45)
+        scale.timingMode = .easeOut
+        ring.run(.sequence([.group([scale, .fadeOut(withDuration: 0.45)]), .removeFromParent()]))
+    }
+
     /// Flashes the ring outward when the shield absorbs a hit.
     func playShieldBreak() {
         let burst = SKShapeNode(circleOfRadius: 34)
@@ -148,6 +188,7 @@ final class HeroNode: SKNode {
 
     /// Blinks while the hero is invulnerable after taking damage.
     func playDamageBlink(duration: TimeInterval) {
+        guard !isOverdriveVisible else { return }
         removeAction(forKey: "blink")
         let blink = SKAction.sequence([.fadeAlpha(to: 0.25, duration: 0.08), .fadeAlpha(to: 1, duration: 0.08)])
         let count = max(1, Int(duration / 0.16))

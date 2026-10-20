@@ -2,7 +2,7 @@ import Foundation
 
 /// A small deterministic random number generator (xorshift64*).
 /// Used for procedural textures so the same seed always draws the same rock.
-struct SeededGenerator: RandomNumberGenerator {
+struct SeededGenerator: RandomNumberGenerator, Equatable, Sendable {
     private var state: UInt64
 
     init(seed: UInt64) {

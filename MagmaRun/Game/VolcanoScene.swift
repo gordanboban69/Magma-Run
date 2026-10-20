@@ -26,8 +26,10 @@ final class VolcanoScene: SKScene {
     private var hero: HeroNode
     private var boulders: [BoulderNode] = []
     private var embers: [EmberNode] = []
+    private var riverNode: LavaRiverNode?
 
     private var background: SKSpriteNode?
+    private var craterGlow: SKSpriteNode?
     private var scenery: [SKNode] = []
     private var layout: SceneryBuilder.Layout
     private var lastUpdateTime: TimeInterval?
@@ -35,8 +37,11 @@ final class VolcanoScene: SKScene {
     private var targetX: CGFloat?
     private var lastSize: CGSize = .zero
     private var hasFinished = false
+    private var lastOverdriveCount = 0
 
     private static let hudInterval: TimeInterval = 0.1
+    /// Extra horizontal slack (points) that still counts as a near miss.
+    private static let nearMissMargin: CGFloat = 26
 
     init(size: CGSize, loadout: HeroLoadout, controlScheme: ControlScheme) {
         session = RunSession(loadout: loadout)
@@ -84,8 +89,10 @@ final class VolcanoScene: SKScene {
         background = sky
 
         scenery.forEach { $0.removeFromParent() }
+        let glow = SceneryBuilder.makeCraterGlow(at: layout.craterPoint, sceneSize: newSize)
+        craterGlow = glow
         scenery = [
-            SceneryBuilder.makeCraterGlow(at: layout.craterPoint, sceneSize: newSize),
+            glow,
             SceneryBuilder.makeMountain(size: newSize, crater: layout.craterPoint),
             SceneryBuilder.makeCraterSmoke(at: layout.craterPoint),
             SceneryBuilder.makeSparks(at: layout.craterPoint),
@@ -93,6 +100,7 @@ final class VolcanoScene: SKScene {
             SceneryBuilder.makeGround(size: newSize, heroY: layout.heroY)
         ]
         scenery.forEach { world.addChild($0) }
+        applyMoodTint(animated: false)
 
         if hero.parent == nil {
             hero.position = CGPoint(x: newSize.width / 2, y: layout.heroY)
@@ -102,6 +110,11 @@ final class VolcanoScene: SKScene {
             let clampedX = min(max(hero.position.x, horizontalMargin), newSize.width - horizontalMargin)
             hero.position = CGPoint(x: clampedX, y: layout.heroY)
         }
+
+        // Rebuild the river for the new width if one is active.
+        riverNode?.removeFromParent()
+        riverNode = nil
+        syncRiverNode()
         targetX = nil
     }
 
@@ -113,11 +126,26 @@ final class VolcanoScene: SKScene {
         publishHUD()
     }
 
+    /// Freezes or resumes the simulation, physics and actions. Idempotent.
+    func setSuspended(_ suspended: Bool) {
+        isSuspended = suspended
+        isPaused = suspended
+        physicsWorld.speed = suspended ? 0 : 1
+        if !suspended {
+            // Forget the stale timestamp so the first frame after resuming is a small step.
+            lastUpdateTime = nil
+            steeringDirection = 0
+            targetX = nil
+        }
+    }
+
+    private var isSuspended = false
+
     // MARK: - Frame update
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastUpdateTime = currentTime }
-        guard isRunning, !session.isOver else { return }
+        guard isRunning, !isSuspended, !session.isOver else { return }
         guard let last = lastUpdateTime else { return }
 
         // Clamp so a pause or hitch never produces a giant simulation step.
@@ -131,12 +159,27 @@ final class VolcanoScene: SKScene {
         if tick.spawnEmber {
             spawnEmber()
         }
+        if tick.moodChanged {
+            applyMoodTint(animated: true)
+            gameDelegate?.scene(self, didRegister: .moodChanged(session.mood))
+        }
+        if tick.lavaStartedFlowing {
+            gameDelegate?.scene(self, didRegister: .lavaStarted)
+        }
 
         moveHero(dt: dt)
         applyMagnet()
         cullBoulders()
         cullEmbers()
+        syncRiverNode()
+        checkLava()
+        fireShockwaveIfReady()
 
+        hero.setOverdrive(session.isOverdrive)
+        if session.overdrivesTriggered > lastOverdriveCount {
+            lastOverdriveCount = session.overdrivesTriggered
+            gameDelegate?.scene(self, didRegister: .overdriveStarted)
+        }
         if session.hasShield {
             hero.setShieldVisible(session.isShieldReady)
         }
@@ -188,11 +231,82 @@ final class VolcanoScene: SKScene {
         }
     }
 
+    // MARK: - Signature mechanics
+
+    /// Lava rivers: keep the ground node in sync with the session's river state.
+    private func syncRiverNode() {
+        guard let river = session.lavaRiver else {
+            if let node = riverNode {
+                node.drain()
+                riverNode = nil
+            }
+            return
+        }
+
+        let width = CGFloat(river.end - river.start) * size.width
+        if riverNode == nil {
+            let groundTop = layout.heroY - HeroNode.bodyRadius - 10
+            let node = LavaRiverNode(width: width, groundHeight: groundTop)
+            node.position = CGPoint(x: CGFloat(river.start) * size.width, y: 0)
+            world.addChild(node)
+            riverNode = node
+        }
+        if river.phase == .flowing, riverNode?.phase == .warning {
+            riverNode?.startFlowing(width: width)
+        }
+    }
+
+    /// Lava rivers: burn the hero while standing in flowing lava.
+    private func checkLava() {
+        let normalizedX = Double(hero.position.x / max(size.width, 1))
+        guard session.isLavaBurning(atNormalizedX: normalizedX) else { return }
+        let outcome = session.registerLavaBurn()
+        handle(outcome: outcome)
+    }
+
+    /// Rage: a full bar detonates and clears nearby boulders.
+    private func fireShockwaveIfReady() {
+        guard session.consumeShockwave() else { return }
+        let radius = max(size.width, size.height) * 0.75
+        var smashed = 0
+        for boulder in boulders where boulder.parent != nil {
+            let distance = hypot(boulder.position.x - hero.position.x, boulder.position.y - hero.position.y)
+            if distance <= radius {
+                boulder.shatter()
+                smashed += 1
+            }
+        }
+        boulders.removeAll { $0.parent == nil || $0.physicsBody == nil }
+        session.registerShockwaveSmash(count: smashed)
+        hero.playShockwave(radius: radius)
+        shakeWorld(intensity: 14)
+        gameDelegate?.scene(self, didRegister: .shockwave)
+        publishHUD()
+    }
+
+    /// Moods: tint the crater glow to telegraph the current phase.
+    private func applyMoodTint(animated: Bool) {
+        guard let craterGlow else { return }
+        let color: UIColor
+        switch session.mood {
+        case .steady: color = UIColor(red: 1.0, green: 0.40, blue: 0.10, alpha: 1)
+        case .fury: color = UIColor(red: 1.0, green: 0.12, blue: 0.08, alpha: 1)
+        case .ashRain: color = UIColor(red: 0.75, green: 0.62, blue: 0.70, alpha: 1)
+        case .emberShower: color = UIColor(red: 1.0, green: 0.78, blue: 0.25, alpha: 1)
+        }
+        if animated {
+            craterGlow.run(.colorize(with: color, colorBlendFactor: 1, duration: 0.6))
+        } else {
+            craterGlow.color = color
+        }
+    }
+
     // MARK: - Spawning
 
     private func spawnBoulder() {
         let multiplier = CGFloat(GameBalance.speedMultiplier(at: session.elapsed))
-        let isRain = Double.random(in: 0..<1) < GameBalance.rainProbability(at: session.elapsed)
+        let rainChance = session.mood.rainProbability ?? GameBalance.rainProbability(at: session.elapsed)
+        let isRain = Double.random(in: 0..<1) < rainChance
         let radius = CGFloat.random(in: 15...31)
         let boulder = BoulderNode(radius: radius, variant: Int.random(in: 0..<4), isHot: Double.random(in: 0..<1) < 0.25)
         guard let body = boulder.physicsBody else { return }
@@ -213,7 +327,7 @@ final class VolcanoScene: SKScene {
             body.affectedByGravity = true
 
             let launchSpeed = CGFloat.random(in: 240...500) * multiplier
-            let isAimed = Double.random(in: 0..<1) < 0.6
+            let isAimed = Double.random(in: 0..<1) < session.mood.aimedProbability
             let targetX: CGFloat = isAimed
                 ? hero.position.x + CGFloat.random(in: -90...90)
                 : CGFloat.random(in: horizontalMargin...(size.width - horizontalMargin))
@@ -264,7 +378,12 @@ final class VolcanoScene: SKScene {
             if boulder.parent == nil { return true }
             if !boulder.hasBeenDodged, boulder.position.y + boulder.radius < dodgeLine {
                 boulder.hasBeenDodged = true
-                session.registerDodge()
+                let horizontalGap = abs(boulder.position.x - hero.position.x) - boulder.radius - HeroNode.bodyRadius
+                if horizontalGap <= Self.nearMissMargin {
+                    session.registerNearMiss()
+                } else {
+                    session.registerDodge()
+                }
             }
             let outOfBounds = boulder.position.y < -boulder.radius * 2 - 40
                 || boulder.position.x < -size.width * 0.3
@@ -293,10 +412,15 @@ final class VolcanoScene: SKScene {
     private func handleBoulderHit(_ boulder: BoulderNode) {
         let outcome = session.registerBoulderHit()
         boulder.shatter()
+        handle(outcome: outcome)
+    }
 
+    private func handle(outcome: HitOutcome) {
         switch outcome {
         case .ignored:
-            break
+            return
+        case .overdriveSmash:
+            shakeWorld(intensity: 4)
         case .shieldAbsorbed:
             hero.playShieldBreak()
             shakeWorld(intensity: 6)
@@ -363,8 +487,8 @@ final class VolcanoScene: SKScene {
     }
 
     private func updateTarget(from touches: Set<UITouch>) {
-        // Ignore touches during the countdown so the hero does not jump when the run begins.
-        guard isRunning, controlScheme == .drag, let touch = touches.first else { return }
+        // Ignore touches during the countdown and pause so the hero does not jump afterwards.
+        guard isRunning, !isSuspended, controlScheme == .drag, let touch = touches.first else { return }
         targetX = touch.location(in: self).x
     }
 }
