@@ -1,0 +1,386 @@
+import SpriteKit
+
+/// Receives gameplay updates from `VolcanoScene` on the main actor.
+@MainActor
+protocol VolcanoSceneDelegate: AnyObject {
+    func scene(_ scene: VolcanoScene, didUpdate hud: GameHUDState)
+    func scene(_ scene: VolcanoScene, didRegister event: GameEvent)
+    func scene(_ scene: VolcanoScene, didFinishWith summary: RunSummary)
+}
+
+/// The SpriteKit scene for one run: an erupting volcano hurling boulders at the hero.
+/// Gameplay rules live in `RunSession`; this class handles rendering, physics and input.
+@MainActor
+final class VolcanoScene: SKScene {
+    weak var gameDelegate: VolcanoSceneDelegate?
+
+    private(set) var session: RunSession
+    private(set) var isRunning = false
+
+    /// How the player steers. Can be changed while the scene is alive.
+    var controlScheme: ControlScheme
+    /// Direction from the on-screen buttons: `-1`, `0` or `1`.
+    var steeringDirection: CGFloat = 0
+
+    private let world = SKNode()
+    private var hero: HeroNode
+    private var boulders: [BoulderNode] = []
+    private var embers: [EmberNode] = []
+
+    private var background: SKSpriteNode?
+    private var scenery: [SKNode] = []
+    private var layout: SceneryBuilder.Layout
+    private var lastUpdateTime: TimeInterval?
+    private var hudAccumulator: TimeInterval = 0
+    private var targetX: CGFloat?
+    private var lastSize: CGSize = .zero
+    private var hasFinished = false
+
+    private static let hudInterval: TimeInterval = 0.1
+
+    init(size: CGSize, loadout: HeroLoadout, controlScheme: ControlScheme) {
+        session = RunSession(loadout: loadout)
+        hero = HeroNode(skin: loadout.skin)
+        layout = SceneryBuilder.layout(for: size)
+        self.controlScheme = controlScheme
+        super.init(size: size)
+        scaleMode = .resizeFill
+        anchorPoint = .zero
+    }
+
+    @available(*, unavailable)
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("VolcanoScene does not support NSCoding")
+    }
+
+    // MARK: - Lifecycle
+
+    override func didMove(to view: SKView) {
+        backgroundColor = UIColor(red: 0.04, green: 0.02, blue: 0.06, alpha: 1)
+        physicsWorld.gravity = CGVector(dx: 0, dy: -5.5)
+        physicsWorld.contactDelegate = self
+        view.ignoresSiblingOrder = true
+
+        if world.parent == nil {
+            addChild(world)
+        }
+        rebuildScenery(for: view.bounds.size == .zero ? size : view.bounds.size)
+        hero.setShieldVisible(session.isShieldReady, animated: false)
+    }
+
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        guard size != lastSize, size.width > 0, size.height > 0 else { return }
+        rebuildScenery(for: size)
+    }
+
+    private func rebuildScenery(for newSize: CGSize) {
+        lastSize = newSize
+        layout = SceneryBuilder.layout(for: newSize)
+
+        background?.removeFromParent()
+        let sky = SceneryBuilder.makeBackground(size: newSize)
+        addChild(sky)
+        background = sky
+
+        scenery.forEach { $0.removeFromParent() }
+        scenery = [
+            SceneryBuilder.makeCraterGlow(at: layout.craterPoint, sceneSize: newSize),
+            SceneryBuilder.makeMountain(size: newSize, crater: layout.craterPoint),
+            SceneryBuilder.makeCraterSmoke(at: layout.craterPoint),
+            SceneryBuilder.makeSparks(at: layout.craterPoint),
+            SceneryBuilder.makeAsh(size: newSize),
+            SceneryBuilder.makeGround(size: newSize, heroY: layout.heroY)
+        ]
+        scenery.forEach { world.addChild($0) }
+
+        if hero.parent == nil {
+            hero.position = CGPoint(x: newSize.width / 2, y: layout.heroY)
+            hero.zPosition = SceneLayer.hero
+            world.addChild(hero)
+        } else {
+            let clampedX = min(max(hero.position.x, horizontalMargin), newSize.width - horizontalMargin)
+            hero.position = CGPoint(x: clampedX, y: layout.heroY)
+        }
+        targetX = nil
+    }
+
+    /// Starts the eruption. Before this the scene idles with the hero in place.
+    func startRun() {
+        guard !isRunning, !session.isOver else { return }
+        isRunning = true
+        lastUpdateTime = nil
+        publishHUD()
+    }
+
+    // MARK: - Frame update
+
+    override func update(_ currentTime: TimeInterval) {
+        defer { lastUpdateTime = currentTime }
+        guard isRunning, !session.isOver else { return }
+        guard let last = lastUpdateTime else { return }
+
+        // Clamp so a pause or hitch never produces a giant simulation step.
+        let dt = min(max(currentTime - last, 0), 1.0 / 20.0)
+        guard dt > 0 else { return }
+
+        let tick = session.advance(by: dt)
+        for _ in 0..<tick.bouldersToSpawn {
+            spawnBoulder()
+        }
+        if tick.spawnEmber {
+            spawnEmber()
+        }
+
+        moveHero(dt: dt)
+        applyMagnet()
+        cullBoulders()
+        cullEmbers()
+
+        if session.hasShield {
+            hero.setShieldVisible(session.isShieldReady)
+        }
+
+        hudAccumulator += dt
+        if hudAccumulator >= Self.hudInterval {
+            hudAccumulator = 0
+            publishHUD()
+        }
+    }
+
+    private var horizontalMargin: CGFloat { HeroNode.bodyRadius + 6 }
+
+    /// Scales movement so wide screens stay fair.
+    private var effectiveMoveSpeed: CGFloat {
+        let widthFactor = min(max(size.width / 390, 1), 1.7)
+        return CGFloat(session.loadout.moveSpeed) * widthFactor
+    }
+
+    private func moveHero(dt: TimeInterval) {
+        let speed = effectiveMoveSpeed
+        var dx: CGFloat = 0
+
+        switch controlScheme {
+        case .drag:
+            if let targetX {
+                let diff = targetX - hero.position.x
+                dx = min(abs(diff), speed * dt) * (diff < 0 ? -1 : 1)
+            }
+        case .buttons:
+            dx = steeringDirection * speed * dt
+        }
+
+        let newX = min(max(hero.position.x + dx, horizontalMargin), size.width - horizontalMargin)
+        let appliedDx = newX - hero.position.x
+        hero.position.x = newX
+        hero.setLean(dt > 0 ? appliedDx / (speed * dt) : 0)
+    }
+
+    private func applyMagnet() {
+        let radius = CGFloat(session.loadout.magnetRadius)
+        guard radius > 0 else { return }
+        for ember in embers where !ember.isCollected {
+            let delta = CGPoint(x: hero.position.x - ember.position.x, y: hero.position.y - ember.position.y)
+            let distance = hypot(delta.x, delta.y)
+            guard distance < radius, distance > 1, let body = ember.physicsBody else { continue }
+            let pull: CGFloat = 520
+            body.velocity = CGVector(dx: delta.x / distance * pull, dy: delta.y / distance * pull)
+        }
+    }
+
+    // MARK: - Spawning
+
+    private func spawnBoulder() {
+        let multiplier = CGFloat(GameBalance.speedMultiplier(at: session.elapsed))
+        let isRain = Double.random(in: 0..<1) < GameBalance.rainProbability(at: session.elapsed)
+        let radius = CGFloat.random(in: 15...31)
+        let boulder = BoulderNode(radius: radius, variant: Int.random(in: 0..<4), isHot: Double.random(in: 0..<1) < 0.25)
+        guard let body = boulder.physicsBody else { return }
+
+        if isRain {
+            boulder.position = CGPoint(
+                x: CGFloat.random(in: horizontalMargin...(size.width - horizontalMargin)),
+                y: size.height + radius + 10
+            )
+            body.affectedByGravity = false
+            body.velocity = CGVector(
+                dx: CGFloat.random(in: -40...40),
+                dy: -CGFloat.random(in: 190...320) * multiplier
+            )
+        } else {
+            let crater = layout.craterPoint
+            boulder.position = CGPoint(x: crater.x + CGFloat.random(in: -14...14), y: crater.y)
+            body.affectedByGravity = true
+
+            let launchSpeed = CGFloat.random(in: 240...500) * multiplier
+            let isAimed = Double.random(in: 0..<1) < 0.6
+            let targetX: CGFloat = isAimed
+                ? hero.position.x + CGFloat.random(in: -90...90)
+                : CGFloat.random(in: horizontalMargin...(size.width - horizontalMargin))
+
+            // Solve the ballistic flight time down to the hero's height, then pick
+            // the horizontal speed that lands the boulder near the target.
+            let gravity = abs(physicsWorld.gravity.dy) * 150
+            let drop = max(crater.y - hero.position.y, 1)
+            let flightTime = (launchSpeed + sqrt(launchSpeed * launchSpeed + 2 * gravity * drop)) / gravity
+            let maxHorizontal = 260 * multiplier
+            let vx = min(max((targetX - crater.x) / flightTime, -maxHorizontal), maxHorizontal)
+            body.velocity = CGVector(dx: vx, dy: launchSpeed)
+        }
+
+        body.angularVelocity = CGFloat.random(in: -5...5)
+        world.addChild(boulder)
+        boulders.append(boulder)
+    }
+
+    private func spawnEmber() {
+        let ember = EmberNode()
+        let crater = layout.craterPoint
+        let fromCrater = Bool.random()
+        if fromCrater {
+            ember.position = CGPoint(x: crater.x, y: crater.y + 10)
+            ember.physicsBody?.affectedByGravity = true
+            ember.physicsBody?.velocity = CGVector(
+                dx: CGFloat.random(in: -size.width * 0.35...size.width * 0.35),
+                dy: CGFloat.random(in: 380...560)
+            )
+            ember.physicsBody?.linearDamping = 0.9
+        } else {
+            ember.position = CGPoint(
+                x: CGFloat.random(in: horizontalMargin...(size.width - horizontalMargin)),
+                y: size.height + 20
+            )
+            ember.physicsBody?.velocity = CGVector(dx: 0, dy: -CGFloat.random(in: 90...140))
+        }
+        world.addChild(ember)
+        embers.append(ember)
+    }
+
+    // MARK: - Cleanup
+
+    private func cullBoulders() {
+        let dodgeLine = hero.position.y - HeroNode.bodyRadius
+        boulders.removeAll { boulder in
+            if boulder.parent == nil { return true }
+            if !boulder.hasBeenDodged, boulder.position.y + boulder.radius < dodgeLine {
+                boulder.hasBeenDodged = true
+                session.registerDodge()
+            }
+            let outOfBounds = boulder.position.y < -boulder.radius * 2 - 40
+                || boulder.position.x < -size.width * 0.3
+                || boulder.position.x > size.width * 1.3
+            if outOfBounds {
+                boulder.removeFromParent()
+                return true
+            }
+            return false
+        }
+    }
+
+    private func cullEmbers() {
+        embers.removeAll { ember in
+            if ember.parent == nil { return true }
+            if ember.position.y < -40 || ember.position.x < -60 || ember.position.x > size.width + 60 {
+                ember.removeFromParent()
+                return true
+            }
+            return false
+        }
+    }
+
+    // MARK: - Collisions
+
+    private func handleBoulderHit(_ boulder: BoulderNode) {
+        let outcome = session.registerBoulderHit()
+        boulder.shatter()
+
+        switch outcome {
+        case .ignored:
+            break
+        case .shieldAbsorbed:
+            hero.playShieldBreak()
+            shakeWorld(intensity: 6)
+            gameDelegate?.scene(self, didRegister: .shieldAbsorbed)
+        case .damaged:
+            hero.playDamageBlink(duration: GameBalance.invulnerabilityDuration)
+            shakeWorld(intensity: 10)
+            gameDelegate?.scene(self, didRegister: .damaged)
+        case .fatal:
+            finishRun()
+        }
+        publishHUD()
+    }
+
+    private func handleEmberPickup(_ ember: EmberNode) {
+        guard !ember.isCollected else { return }
+        ember.collect()
+        session.registerEmberPickup()
+        gameDelegate?.scene(self, didRegister: .emberCollected)
+        publishHUD()
+    }
+
+    private func finishRun() {
+        guard !hasFinished else { return }
+        hasFinished = true
+        isRunning = false
+        shakeWorld(intensity: 16)
+        gameDelegate?.scene(self, didRegister: .defeated)
+
+        let summary = session.summary
+        hero.playDefeat { [weak self] in
+            guard let self else { return }
+            self.gameDelegate?.scene(self, didFinishWith: summary)
+        }
+    }
+
+    private func shakeWorld(intensity: CGFloat) {
+        world.removeAction(forKey: "shake")
+        var actions: [SKAction] = []
+        var amplitude = intensity
+        for _ in 0..<5 {
+            let dx = CGFloat.random(in: -amplitude...amplitude)
+            let dy = CGFloat.random(in: -amplitude...amplitude)
+            actions.append(.moveBy(x: dx, y: dy, duration: 0.03))
+            actions.append(.moveBy(x: -dx, y: -dy, duration: 0.03))
+            amplitude *= 0.6
+        }
+        actions.append(.move(to: .zero, duration: 0.02))
+        world.run(.sequence(actions), withKey: "shake")
+    }
+
+    private func publishHUD() {
+        gameDelegate?.scene(self, didUpdate: GameHUDState(session: session))
+    }
+
+    // MARK: - Touch input
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        updateTarget(from: touches)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        updateTarget(from: touches)
+    }
+
+    private func updateTarget(from touches: Set<UITouch>) {
+        // Ignore touches during the countdown so the hero does not jump when the run begins.
+        guard isRunning, controlScheme == .drag, let touch = touches.first else { return }
+        targetX = touch.location(in: self).x
+    }
+}
+
+// MARK: - SKPhysicsContactDelegate
+
+extension VolcanoScene: SKPhysicsContactDelegate {
+    func didBegin(_ contact: SKPhysicsContact) {
+        guard isRunning else { return }
+        let nodes = [contact.bodyA.node, contact.bodyB.node]
+        guard nodes.contains(where: { $0 is HeroNode }) else { return }
+
+        if let boulder = nodes.compactMap({ $0 as? BoulderNode }).first {
+            handleBoulderHit(boulder)
+        } else if let ember = nodes.compactMap({ $0 as? EmberNode }).first {
+            handleEmberPickup(ember)
+        }
+    }
+}
