@@ -34,7 +34,7 @@ struct ForgeView: View {
         .background(VolcanoBackdrop(emberCount: 16))
         .navigationTitle("Forge")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .accessibilityIdentifier(AccessibilityID.Forge.screen)
     }

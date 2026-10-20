@@ -115,13 +115,18 @@ struct HomeView: View {
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(2)
-                    HStack(spacing: 6) {
-                        StatChip(systemImage: "heart.fill", text: "\(loadout.maxHearts)", tint: Theme.Colors.danger)
-                        StatChip(systemImage: "hare.fill", text: "Lv \(loadout.agility)")
-                        if loadout.shieldRecharge != nil {
-                            StatChip(systemImage: "shield.lefthalf.filled", text: "Lv \(loadout.shield)", tint: Color(red: 0.6, green: 0.8, blue: 1.0))
+                    // Chips never wrap: the row scrolls if a narrow screen cannot fit them.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            StatChip(systemImage: "heart.fill", text: "\(loadout.maxHearts)", tint: Theme.Colors.danger)
+                            StatChip(systemImage: "hare.fill", text: "Lv \(loadout.agility)")
+                            if loadout.shieldRecharge != nil {
+                                StatChip(systemImage: "shield.lefthalf.filled", text: "Lv \(loadout.shield)", tint: Color(red: 0.6, green: 0.8, blue: 1.0))
+                            }
                         }
+                        .fixedSize()
                     }
+                    .scrollClipDisabled()
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")

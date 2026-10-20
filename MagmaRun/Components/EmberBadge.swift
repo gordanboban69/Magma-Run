@@ -42,6 +42,8 @@ struct StatChip: View {
             Text(text)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Theme.Colors.textSecondary)
+                .lineLimit(1)
+                .fixedSize()
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 9)

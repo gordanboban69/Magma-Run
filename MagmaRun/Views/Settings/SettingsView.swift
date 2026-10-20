@@ -85,7 +85,7 @@ struct SettingsView: View {
         .background(VolcanoBackdrop(emberCount: 12))
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .confirmationDialog(
             "Reset all progress?",

@@ -80,7 +80,7 @@ struct HowToPlayView: View {
         .background(VolcanoBackdrop(emberCount: 12))
         .navigationTitle("How to play")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.HowToPlay.screen)

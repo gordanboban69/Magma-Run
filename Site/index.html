@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Magma Run — outrun the eruption</title>
+<meta name="description" content="Magma Run is a fast arcade dodge game for iPhone and iPad. Steer your runner through an endless eruption, build rage, chain embers into overdrive and forge permanent upgrades. Fully offline.">
+<link rel="canonical" href="https://magmarun.site/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Magma Run — outrun the eruption">
+<meta property="og:description" content="An arcade dodge game for iPhone and iPad. Dodge boulders, ride the volcano's moods and forge your runner.">
+<meta property="og:url" content="https://magmarun.site/">
+<meta property="og:image" content="https://magmarun.site/assets/icon-512.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0e0912">
+<link rel="icon" type="image/png" href="assets/icon-512.png">
+<link rel="apple-touch-icon" href="assets/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0912; --bg-2:#1a0f17; --surface:#1f1420; --surface-2:#2b1a27;
+    --line:rgba(255,255,255,.08); --text:#fff; --muted:rgba(255,255,255,.68); --dim:rgba(255,255,255,.42);
+    --lava:#ff5c1a; --ember:#ffb338; --magma:#db2938; --ash:#a39aa8; --success:#73db8c; --ice:#99ccff;
+    --radius-lg:26px; --radius-md:16px;
+    --shadow:0 18px 50px rgba(0,0,0,.45);
+    --grad:linear-gradient(135deg,var(--ember),var(--lava) 55%,var(--magma));
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Nunito",system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;overflow-x:hidden}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;background:
+    radial-gradient(900px 500px at 50% 110%, rgba(255,92,26,.28), transparent 60%),
+    radial-gradient(700px 400px at 85% -10%, rgba(219,41,56,.22), transparent 60%),
+    linear-gradient(180deg,#2a0f1a 0%,var(--bg) 40%,#070409 100%)}
+  a{color:inherit}
+  img{max-width:100%;display:block}
+  h1,h2,h3,.btn,.logo{font-family:"Rubik","Nunito",sans-serif;letter-spacing:-.01em}
+  h1{font-size:clamp(2.6rem,7vw,4.6rem);line-height:1.02;margin:0 0 18px;font-weight:900}
+  h2.section-title{font-size:clamp(1.7rem,4vw,2.5rem);margin:0 0 10px;font-weight:900}
+  h3{font-size:1.15rem;margin:0 0 6px;font-weight:700}
+  p{margin:0 0 14px}
+  .wrap{width:min(1120px,calc(100% - 40px));margin:0 auto}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .eyebrow{display:inline-block;font-weight:800;font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-bottom:12px}
+  .lead{font-size:1.15rem;color:var(--muted);max-width:60ch}
+  section{padding:84px 0}
+  section.tight{padding:56px 0}
+
+  /* header */
+  header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(14,9,18,.72);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:66px;gap:16px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:900;text-decoration:none;font-size:1.05rem}
+  .logo img{width:34px;height:34px;border-radius:9px;box-shadow:0 4px 14px rgba(255,92,26,.4)}
+  .nav ul{display:flex;gap:22px;list-style:none;margin:0;padding:0;font-weight:700;font-size:.95rem}
+  .nav ul a{text-decoration:none;color:var(--muted)}
+  .nav ul a:hover{color:var(--text)}
+  @media (max-width:860px){.nav ul{display:none}}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:999px;font-weight:800;text-decoration:none;transition:transform .15s ease,box-shadow .15s ease;border:1px solid transparent}
+  .btn:hover{transform:translateY(-2px)}
+  .btn-primary{background:var(--grad);color:#fff;box-shadow:0 12px 30px rgba(255,92,26,.4)}
+  .btn-ghost{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);color:#fff}
+  .btn-store{background:#000;border-color:rgba(255,255,255,.25);color:#fff;opacity:.85;cursor:default}
+  .btn-store small{display:block;font-size:.65rem;font-weight:600;opacity:.8;line-height:1}
+  .btn-store span{display:block;font-size:1rem;line-height:1.1}
+
+  /* hero */
+  .hero{padding:70px 0 40px}
+  .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+  @media (max-width:900px){.hero-grid{grid-template-columns:1fr}}
+  .hero .tag{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:999px;background:rgba(255,179,56,.14);border:1px solid rgba(255,179,56,.35);font-weight:800;font-size:.85rem;margin-bottom:20px}
+  .hero .cta{display:flex;flex-wrap:wrap;gap:12px;margin:26px 0 18px}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:10px 18px;color:var(--dim);font-size:.9rem;font-weight:700}
+  .phone{position:relative;width:min(300px,80%);margin:0 auto;border-radius:44px;padding:12px;background:#120b15;border:1px solid rgba(255,255,255,.14);box-shadow:var(--shadow),0 0 80px rgba(255,92,26,.25)}
+  .phone img{border-radius:34px}
+  .phone.float{animation:float 6s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+  /* cards */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:26px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.05),transparent 40%);pointer-events:none}
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media (max-width:980px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:620px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+  .icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:1.35rem;margin-bottom:14px;background:rgba(255,179,56,.14)}
+  .icon.lava{background:rgba(255,92,26,.18)} .icon.ice{background:rgba(153,204,255,.16)} .icon.ash{background:rgba(163,154,168,.18)} .icon.green{background:rgba(115,219,140,.16)} .icon.violet{background:rgba(178,128,255,.18)}
+  .step{counter-increment:step}
+  .step .num{font-family:"Rubik";font-weight:900;font-size:2.6rem;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:8px}
+  .card p{color:var(--muted);margin:0}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.07);font-size:.8rem;font-weight:800;color:var(--muted)}
+  .pill.ok{background:rgba(115,219,140,.14);color:var(--success)}
+  .pill.lock{background:rgba(255,255,255,.06);color:var(--dim)}
+
+  /* mechanics */
+  .mech{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+  @media (max-width:760px){.mech{grid-template-columns:1fr}}
+  .mech .card{padding:30px}
+  .mech .bar{height:8px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:16px}
+  .mech .bar i{display:block;height:100%;width:72%;background:var(--grad)}
+
+  /* heroes */
+  .runner{display:flex;gap:14px;align-items:center}
+  .runner .dot{width:54px;height:54px;border-radius:18px;flex:none;border:3px solid rgba(255,255,255,.2);box-shadow:0 0 24px var(--g,rgba(255,92,26,.5))}
+  .runner small{color:var(--dim);font-weight:700}
+
+  /* gallery */
+  .gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  @media (max-width:980px){.gallery{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:520px){.gallery{grid-template-columns:1fr}}
+  .shot{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:10px;box-shadow:var(--shadow)}
+  .shot img{border-radius:16px;aspect-ratio:402/874;object-fit:cover;width:100%}
+  .shot figcaption{padding:12px 6px 4px;font-weight:700;color:var(--muted);font-size:.9rem}
+
+  /* platforms */
+  .platforms{display:flex;flex-wrap:wrap;gap:12px}
+  .platforms .pill{font-size:.95rem;padding:12px 16px;color:var(--text)}
+
+  /* support */
+  .faq details{border-top:1px solid var(--line);padding:16px 0}
+  .faq details:last-child{border-bottom:1px solid var(--line)}
+  .faq summary{cursor:pointer;font-weight:800;list-style:none;display:flex;justify-content:space-between;gap:12px}
+  .faq summary::after{content:"+";color:var(--ember);font-weight:900}
+  .faq details[open] summary::after{content:"–"}
+  .faq p{color:var(--muted);margin:10px 0 0}
+  .email{font-family:"Rubik";font-weight:700;font-size:1.25rem;text-decoration:none;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* legal */
+  .legal{background:var(--bg-2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .legal .wrap{max-width:820px}
+  .legal h3{margin-top:26px;color:var(--ember)}
+  .legal p,.legal li{color:var(--muted)}
+  .legal .updated{color:var(--dim);font-weight:700;font-size:.9rem}
+
+  /* footer */
+  footer{padding:50px 0 36px;color:var(--dim)}
+  .foot{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:28px}
+  @media (max-width:760px){.foot{grid-template-columns:1fr 1fr}}
+  footer h4{margin:0 0 10px;color:var(--text);font-family:"Rubik"}
+  footer ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  footer a{text-decoration:none;color:var(--muted)} footer a:hover{color:var(--text)}
+  .copy{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);font-size:.9rem}
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .6s ease}
+  .reveal.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}.phone.float{animation:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="#"><img src="assets/icon-512.png" alt="">Magma Run</a>
+    <ul>
+      <li><a href="#about">About</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#mechanics">Mechanics</a></li>
+      <li><a href="#runners">Runners</a></li>
+      <li><a href="#screens">Screenshots</a></li>
+      <li><a href="#devices">Platforms</a></li>
+      <li><a href="#support">Support</a></li>
+    </ul>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="tag">🌋 An arcade dodge game with a temper</span>
+        <h1>Outrun the <span class="grad-text">eruption.</span></h1>
+        <p class="lead">The mountain is awake and it is throwing rocks. Steer your runner through an endless eruption, graze boulders to build rage, chain embers into overdrive and forge a hero that can last one more second.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#screens">See screenshots</a>
+          <a class="btn btn-ghost" href="#how">How it works</a>
+          <span class="btn btn-store" title="Coming soon"><small>Coming soon on the</small><span> App Store</span></span>
+        </div>
+        <div class="meta"><span>📱 iPhone &amp; iPad</span><span>⚙️ iOS 18+</span><span>✈️ Fully offline</span><span>🚫 No ads, no accounts</span></div>
+      </div>
+      <div class="phone float"><img src="assets/screens/run-lava.png" alt="Magma Run gameplay: the runner at the foot of an erupting volcano with a lava river warning on the ground"></div>
+    </div>
+  </section>
+
+  <section id="about" class="tight">
+    <div class="wrap">
+      <span class="eyebrow">About the game</span>
+      <h2 class="section-title">One finger. One runner. One very angry volcano.</h2>
+      <p class="lead">Magma Run is a pick-up-and-play dodge game. Rocks erupt from the crater on real ballistic arcs and rain from the sky as the mountain builds up steam. You move left and right, that is all, but every close call, every ember streak and every lava river turns a simple dodge into a decision.</p>
+      <div class="grid-3 reveal" style="margin-top:28px">
+        <div class="card"><div class="icon lava">🪨</div><h3>Real eruptions</h3><p>Boulders launch from the crater with aimed and random trajectories, then speed up and multiply over two minutes of escalating intensity.</p></div>
+        <div class="card"><div class="icon">🔥</div><h3>Embers are your economy</h3><p>Glowing embers drift down mid-run. Catch them to fund the Forge and unlock new runners between eruptions.</p></div>
+        <div class="card"><div class="icon ice">🛡️</div><h3>Permanent progress</h3><p>Agility, hearts, a recharging shield, an ember magnet and fortune: five upgrades that make each run longer than the last.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="wrap">
+      <span class="eyebrow">How it works</span>
+      <h2 class="section-title">Three steps, every run.</h2>
+      <div class="grid-3 reveal" style="margin-top:24px">
+        <div class="card step"><div class="num">1</div><h3>Steer</h3><p>Drag anywhere and the runner follows your finger. Prefer buttons? Switch to left / right controls in Settings.</p></div>
+        <div class="card step"><div class="num">2</div><h3>Dodge &amp; collect</h3><p>Weave between falling rocks, grab embers and read the banner: the volcano always warns you before it changes mood.</p></div>
+        <div class="card step"><div class="num">3</div><h3>Forge</h3><p>Spend embers on upgrades and new runners, then go back up the mountain stronger.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mechanics" class="tight">
+    <div class="wrap">
+      <span class="eyebrow">Signature mechanics</span>
+      <h2 class="section-title">Four systems that make every run different.</h2>
+      <p class="lead">These are not power-ups you pick up. They are rules of the mountain, and mastering them is the whole game.</p>
+      <div class="mech reveal" style="margin-top:28px">
+        <div class="card"><div class="icon lava">📡</div><h3>Rage &amp; Shockwave</h3><p>Let a boulder graze past instead of running far away. Five near misses fill the rage bar and release a shockwave that shatters every rock around you and scores for each one.</p><div class="bar"><i></i></div></div>
+        <div class="card"><div class="icon">⚠️</div><h3>Lava Rivers</h3><p>Cracks start glowing on a strip of ground. Moments later it floods with lava for a few seconds. Standing in it costs a heart, so the safe side of the screen keeps changing.</p></div>
+        <div class="card"><div class="icon green">⚡</div><h3>Overdrive</h3><p>Six embers in a row without taking damage turn the runner molten. For five seconds boulders shatter on contact, every ember counts double and the streak counter starts again.</p></div>
+        <div class="card"><div class="icon ash">🌋</div><h3>Volcano Moods</h3><p>A banner warns you, then the crater changes colour. <strong>Fury</strong> hurls dense, aimed rocks. <strong>Ash Rain</strong> drops them from the sky. <strong>Ember Shower</strong> is your harvest window.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="runners">
+    <div class="wrap">
+      <span class="eyebrow">Runners</span>
+      <h2 class="section-title">Six heroes, one free, five to earn.</h2>
+      <p class="lead">Every runner plays the same, so pick the one that feels like you. Unlock them with embers you collected yourself.</p>
+      <div class="grid-3 reveal" style="margin-top:24px">
+        <div class="card runner"><div class="dot" style="background:#c7c2cc;--g:rgba(255,140,51,.55)"></div><div><h3>Ash Runner</h3><small>Born in the foothills, raised on falling rock. · <span class="pill ok">Free</span></small></div></div>
+        <div class="card runner"><div class="dot" style="background:#ff9438;--g:rgba(255,217,102,.6)"></div><div><h3>Ember Scout</h3><small>Carries a lantern of living flame. · <span class="pill">150 embers</span></small></div></div>
+        <div class="card runner"><div class="dot" style="background:#382e47;--g:rgba(191,140,255,.6)"></div><div><h3>Obsidian Ghost</h3><small>Moves like smoke between the boulders. · <span class="pill">350 embers</span></small></div></div>
+        <div class="card runner"><div class="dot" style="background:#cc2e24;--g:rgba(255,102,38,.6)"></div><div><h3>Magma Titan</h3><small>Forged in the deepest chamber of the mountain. · <span class="pill">600 embers</span></small></div></div>
+        <div class="card runner"><div class="dot" style="background:#73d9f2;--g:rgba(179,242,255,.6)"></div><div><h3>Crystal Spirit</h3><small>Glows with the light of volcanic glass. · <span class="pill">900 embers</span></small></div></div>
+        <div class="card runner"><div class="dot" style="background:#ffcc40;--g:rgba(255,153,26,.6)"></div><div><h3>Phoenix</h3><small>Rises again every time the mountain roars. · <span class="pill">1,500 embers</span></small></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" class="tight">
+    <div class="wrap">
+      <span class="eyebrow">See it in action</span>
+      <h2 class="section-title">Straight from the game.</h2>
+      <p class="lead">Real captures from Magma Run on iPhone.</p>
+      <div class="gallery reveal" style="margin-top:24px">
+        <figure class="shot"><img src="assets/screens/home.png" alt="Camp screen with the current runner, the play button and shortcuts to Forge, Heroes, Records and How to play"><figcaption>The camp: your runner, your embers</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/ready.png" alt="Pre-run card showing the chosen hero, hearts, speed and the start button"><figcaption>Check your loadout before the eruption</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/run-start.png" alt="Gameplay: boulders launching from the crater while the runner waits below"><figcaption>Rocks arc out of the crater</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/run-shield.png" alt="Gameplay: the shield recharging after absorbing a hit"><figcaption>The shield soaks a hit, then recharges</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/run-lava.png" alt="Gameplay: a lava river warning glowing on the ground and the rage bar filling"><figcaption>Lava river incoming, rage building</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/gameover.png" alt="Results card with a new best score, embers earned, time survived and boulders dodged"><figcaption>New best, embers banked</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/forge.png" alt="Forge screen listing the five upgrades with levels, effects and prices"><figcaption>Forge five permanent upgrades</figcaption></figure>
+        <figure class="shot"><img src="assets/screens/heroes.png" alt="Heroes gallery with unlocked and locked runners"><figcaption>Unlock and equip runners</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="devices">
+    <div class="wrap">
+      <span class="eyebrow">Platforms</span>
+      <h2 class="section-title">Built for iPhone and iPad.</h2>
+      <p class="lead">Magma Run runs fully offline. There is no account, no login and no connection required. Your progress is stored on your device only.</p>
+      <div class="platforms" style="margin-top:18px">
+        <span class="pill">📱 iPhone</span><span class="pill">📲 iPad, every orientation</span><span class="pill">⚙️ iOS 18 or later</span><span class="pill">✈️ Fully offline</span><span class="pill">🤲 Haptic feedback</span><span class="pill">🚫 No ads, no tracking</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="support" class="tight">
+    <div class="wrap grid-2">
+      <div>
+        <span class="eyebrow">We're here to help</span>
+        <h2 class="section-title">Support</h2>
+        <h3>Contact us</h3>
+        <p class="lead">Something not working, or an idea for a new mood of the mountain? Email us and we will get back to you as soon as we can:</p>
+        <a class="email" href="mailto:support@magmarun.site">support@magmarun.site</a>
+      </div>
+      <div class="faq">
+        <h3>Frequently asked questions</h3>
+        <details open><summary>Do I need an internet connection to play?</summary><p>No. Magma Run is fully offline. Upgrades, runners and records live on your device.</p></details>
+        <details><summary>Can I buy embers?</summary><p>No. There are no in-app purchases. Every ember is earned by playing.</p></details>
+        <details><summary>I switched phones. Where is my progress?</summary><p>Progress is stored locally on the device. Restore the device from an iCloud or computer backup to bring it along.</p></details>
+        <details><summary>The runner feels slow.</summary><p>Forge the Agility upgrade. Each level adds movement speed, and wide screens get a proportional speed boost automatically.</p></details>
+        <details><summary>How do I reset my progress?</summary><p>Open Settings inside the game and tap Reset. You will be asked to confirm; it cannot be undone.</p></details>
+        <details><summary>Something crashed or looks wrong.</summary><p>Write to <a href="mailto:support@magmarun.site">support@magmarun.site</a> with your device model and iOS version, or use <a href="https://reportaproblem.apple.com" rel="noopener">reportaproblem.apple.com</a>.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" class="legal">
+    <div class="wrap">
+      <span class="eyebrow">Legal</span>
+      <h2 class="section-title">Privacy Policy</h2>
+      <p class="updated">Last updated: October 20, 2026</p>
+      <h3>Overview</h3>
+      <p>Magma Run ("the App", "we", "us") is an arcade game for iPhone and iPad. This policy explains what information the App handles and how. The short version: the App works entirely on your device and does not collect, transmit or sell personal data.</p>
+      <h3>Information we receive</h3>
+      <p>The App does not require an account and does not ask for your name, email, location, contacts, photos or any other personal information. It does not contain advertising or third-party analytics and makes no network requests of its own.</p>
+      <h3>Data stored on your device</h3>
+      <p>Game progress (embers, upgrade levels, unlocked runners, best scores, run history and achievements) and your preferences (control scheme, haptics) are stored locally on your device using Apple's on-device storage. This data never leaves your device unless you include it in a device backup you control.</p>
+      <h3>Apple services</h3>
+      <p>If you download the App from the App Store, Apple may collect information such as crash reports or usage statistics according to your device settings and Apple's privacy policy. We receive only aggregated, anonymised reports that Apple makes available to developers.</p>
+      <h3>Your choices</h3>
+      <p>You can erase all game data at any time from Settings inside the App ("Reset progress") or by deleting the App. Haptic feedback can be switched off in the same Settings screen.</p>
+      <h3>Children's privacy</h3>
+      <p>The App is suitable for all ages and does not knowingly collect any information from anyone, including children under 13.</p>
+      <h3>Changes</h3>
+      <p>If this policy changes, the updated version will be published on this page with a new "Last updated" date.</p>
+      <h3>Contact</h3>
+      <p>Questions about privacy: <a href="mailto:support@magmarun.site">support@magmarun.site</a>.</p>
+    </div>
+  </section>
+
+  <section id="terms" class="legal" style="border-top:0">
+    <div class="wrap">
+      <span class="eyebrow">Legal</span>
+      <h2 class="section-title">Terms of Use</h2>
+      <p class="updated">Last updated: October 20, 2026</p>
+      <h3>Acceptance</h3>
+      <p>By downloading or playing Magma Run ("the App"), you agree to these Terms of Use. If you do not agree, please do not use the App.</p>
+      <h3>License</h3>
+      <p>We grant you a personal, non-transferable, non-exclusive, revocable licence to install and play the App on Apple devices that you own or control, as permitted by the App Store Terms of Service. You may not copy, modify, reverse engineer, distribute or create derivative works from the App except where the law expressly allows it.</p>
+      <h3>Virtual currency</h3>
+      <p>Embers, runners and upgrades are virtual items earned solely by playing. They have no monetary value, cannot be purchased, sold, transferred or exchanged for real money, and may be reset by you at any time from Settings.</p>
+      <h3>Acceptable use</h3>
+      <p>Do not use the App in any way that violates applicable law, interferes with its operation, or attempts to extract its source code or assets.</p>
+      <h3>Disclaimer &amp; limitation of liability</h3>
+      <p>The App is provided "as is" without warranties of any kind. To the fullest extent permitted by law, we are not liable for any indirect, incidental or consequential damages arising from your use of, or inability to use, the App. Our total liability for any claim relating to the App will not exceed the amount you paid for it, which is zero.</p>
+      <h3>Changes</h3>
+      <p>We may update the App and these Terms from time to time. Continued use of the App after an update means you accept the revised Terms.</p>
+      <h3>Contact</h3>
+      <p>Questions about these Terms: <a href="mailto:support@magmarun.site">support@magmarun.site</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <a class="logo" href="#"><img src="assets/icon-512.png" alt="">Magma Run</a>
+        <p style="margin-top:12px;max-width:34ch">An arcade dodge game for iPhone and iPad. Outrun the eruption.</p>
+      </div>
+      <div><h4>Game</h4><ul><li><a href="#mechanics">Mechanics</a></li><li><a href="#runners">Runners</a></li><li><a href="#screens">Screenshots</a></li><li><a href="#devices">Platforms</a></li></ul></div>
+      <div><h4>Store</h4><ul><li><span>App Store (coming soon)</span></li></ul></div>
+      <div><h4>Legal</h4><ul><li><a href="#privacy">Privacy Policy</a></li><li><a href="#terms">Terms of Use</a></li><li><a href="#support">Support</a></li></ul></div>
+    </div>
+    <div class="copy">© 2026 Magma Run. All rights reserved.</div>
+  </div>
+</footer>
+
+<script>
+  // Fade sections in as they scroll into view.
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+</script>
+</body>
+</html>

@@ -57,7 +57,7 @@ struct RecordsView: View {
         .background(VolcanoBackdrop(emberCount: 16))
         .navigationTitle("Records")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.Records.screen)
     }

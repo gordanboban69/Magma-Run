@@ -67,8 +67,8 @@ enum VolcanoMood: String, CaseIterable, Equatable, Sendable {
     var spawnIntervalMultiplier: Double {
         switch self {
         case .steady: 1
-        case .fury: 0.55
-        case .ashRain: 0.8
+        case .fury: 0.65
+        case .ashRain: 0.85
         case .emberShower: 1.4
         }
     }
@@ -80,7 +80,7 @@ enum VolcanoMood: String, CaseIterable, Equatable, Sendable {
 
     /// Probability that a crater boulder is aimed at the hero.
     var aimedProbability: Double {
-        self == .fury ? 0.9 : 0.6
+        self == .fury ? 0.8 : 0.55
     }
 
     /// Multiplier for the time between ember drops.
@@ -134,8 +134,8 @@ struct RunSession: Equatable, Sendable {
     static let overdriveComboLength = 6
     static let overdriveDuration: TimeInterval = 5
     static let overdriveSmashScore: Double = 15
-    static let firstMoodDelay: TimeInterval = 10
-    static let firstRiverDelay: TimeInterval = 8
+    static let firstMoodDelay: TimeInterval = 16
+    static let firstRiverDelay: TimeInterval = 10
 
     let loadout: HeroLoadout
 

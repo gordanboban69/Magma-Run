@@ -43,7 +43,7 @@ struct HeroesView: View {
         .background(VolcanoBackdrop(emberCount: 16))
         .navigationTitle("Heroes")
         .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.Heroes.screen)

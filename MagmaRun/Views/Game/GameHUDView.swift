@@ -125,8 +125,10 @@ struct GameHUDView: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.black.opacity(0.4))
+                .fill(.black.opacity(0.62))
         )
+        // Keep the rolling digits inside the pill.
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
