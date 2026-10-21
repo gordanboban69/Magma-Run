@@ -1,0 +1,46 @@
+workflows:
+  app-store-release:
+    name: Magma Run – App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lumeridge.kestrelpath
+      vars:
+        BUNDLE_ID: "com.lumeridge.kestrelpath"
+        XCODE_PROJECT: "MagmaRun.xcodeproj"
+        XCODE_SCHEME: "MagmaRun"
+      xcode: latest
+
+    scripts:
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build App Store IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "release-*"
+          include: true
