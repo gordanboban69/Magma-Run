@@ -5,9 +5,6 @@ workflows:
     max_build_duration: 60
 
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.lumeridge.kestrelpath
       vars:
         BUNDLE_ID: "com.lumeridge.kestrelpath"
         XCODE_PROJECT: "MagmaRun.xcodeproj"
