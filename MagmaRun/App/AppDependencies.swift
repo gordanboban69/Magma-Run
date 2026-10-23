@@ -14,7 +14,11 @@ final class AppDependencies {
     private static let uiTestingDefaultsSuite = "com.lumeridge.kestrelpath.uitesting"
 
     init(launchArguments: [String] = CommandLine.arguments) throws {
+        #if DEBUG
         isUITesting = launchArguments.contains(Self.uiTestingArgument)
+        #else
+        isUITesting = false
+        #endif
 
         let defaults: UserDefaults
         if isUITesting, let suite = UserDefaults(suiteName: Self.uiTestingDefaultsSuite) {
