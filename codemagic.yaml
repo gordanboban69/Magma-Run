@@ -5,8 +5,13 @@ workflows:
     max_build_duration: 60
 
     environment:
+      groups:
+        - magma_release
       vars:
         BUNDLE_ID: "com.lumeridge.kestrelpath"
+        APP_STORE_APPLE_ID: "6825416418"
+        APP_STORE_CONNECT_ISSUER_ID: "3876ae3f-9703-45da-bc80-cbea148c5e22"
+        APP_STORE_CONNECT_KEY_IDENTIFIER: "8G8BQTUJ77"
         XCODE_PROJECT: "MagmaRun.xcodeproj"
         XCODE_SCHEME: "MagmaRun"
       xcode: latest
@@ -14,26 +19,42 @@ workflows:
     scripts:
       - name: Set up code signing
         script: |
+          set -e
+          : "${MAGMA_CERTIFICATE_P12:?Missing signing certificate}"
+          : "${MAGMA_CERTIFICATE_PASSWORD:?Missing certificate password}"
+          : "${MAGMA_PROVISIONING_PROFILE:?Missing provisioning profile}"
+          : "${APP_STORE_CONNECT_PRIVATE_KEY:?Missing Apple API key}"
+          umask 077
+          SIGNING_DIR="$CM_BUILD_DIR/.magma-signing"
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$SIGNING_DIR" "$PROFILE_DIR"
+          printf '%s' "$MAGMA_CERTIFICATE_P12" | base64 --decode > "$SIGNING_DIR/distribution.p12"
+          printf '%s' "$MAGMA_PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_DIR/magmarun.mobileprovision"
           keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-          keychain add-certificates
+          keychain add-certificates --certificate "$SIGNING_DIR/distribution.p12" --certificate-password @env:MAGMA_CERTIFICATE_PASSWORD
           xcode-project use-profiles
 
       - name: Build App Store IPA
         script: |
+          set -e
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
 
+      - name: Upload new build to App Store Connect
+        script: |
+          set -e
+          APP_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' "$CM_BUILD_DIR"/build/ios/xcarchive/*.xcarchive/Info.plist)
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" --platform IOS)
+          if [ "$APP_BUILD_NUMBER" -le "$LATEST_BUILD_NUMBER" ]; then
+            echo "Build $APP_BUILD_NUMBER already exists in App Store Connect; keeping the signed IPA artifact without a duplicate upload."
+          else
+            app-store-connect publish --path "$CM_BUILD_DIR/build/ios/ipa/*.ipa"
+          fi
+
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
 
     triggering:
       events:
