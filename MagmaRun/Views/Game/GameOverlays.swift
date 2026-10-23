@@ -6,12 +6,25 @@ private struct OverlayScrim<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.55)
+            Color.black.opacity(0.72)
                 .ignoresSafeArea()
             content
                 .frame(maxWidth: 440)
                 .padding(.horizontal, 24)
         }
+    }
+}
+
+extension View {
+    /// Places overlay content on the carved obsidian stele; the arch on top stays clear.
+    func steleBackground(isGlowing: Bool = false) -> some View {
+        padding(.horizontal, 30)
+            .padding(.top, 92)
+            .padding(.bottom, 56)
+            .background {
+                NineSlice(piece: Chrome.stele, scale: 0.75)
+                    .shadow(color: isGlowing ? Theme.Colors.lava.opacity(0.6) : .black.opacity(0.6), radius: isGlowing ? 26 : 18)
+            }
     }
 }
 
@@ -37,10 +50,10 @@ struct ReadyOverlay: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
                 HStack(spacing: 8) {
-                    StatChip(systemImage: "heart.fill", text: "\(loadout.maxHearts) hearts", tint: Theme.Colors.danger)
-                    StatChip(systemImage: "hare.fill", text: "Speed \(Int(loadout.moveSpeed))")
+                    StatChip(systemImage: "heart.fill", text: "\(loadout.maxHearts) hearts", tint: Theme.Colors.danger, art: Art.HUD.heartFull)
+                    StatChip(systemImage: "hare.fill", text: "Speed \(Int(loadout.moveSpeed))", art: Art.upgrade(.agility))
                     if let recharge = loadout.shieldRecharge {
-                        StatChip(systemImage: "shield.lefthalf.filled", text: "\(Int(recharge))s", tint: Color(red: 0.6, green: 0.8, blue: 1.0))
+                        StatChip(systemImage: "shield.lefthalf.filled", text: "\(Int(recharge))s", tint: Color(red: 0.6, green: 0.8, blue: 1.0), art: Art.HUD.shield)
                     }
                 }
                 Label(
@@ -56,12 +69,13 @@ struct ReadyOverlay: View {
                 .buttonStyle(LavaButtonStyle())
                 .accessibilityIdentifier(AccessibilityID.Game.startButton)
 
-                Button("Back to camp", action: onQuit)
+                Button(action: onQuit) {
+                    Label("Back to camp", systemImage: "house.fill")
+                }
                     .buttonStyle(GhostButtonStyle())
                     .accessibilityIdentifier(AccessibilityID.Game.quitButton)
             }
-            .padding(26)
-            .cardBackground()
+            .steleBackground()
         }
     }
 }
@@ -75,7 +89,8 @@ struct CountdownOverlay: View {
             Color.black.opacity(0.25).ignoresSafeArea()
             Text("\(value)")
                 .font(.display(120, weight: .black))
-                .foregroundStyle(Theme.emberGradient)
+                .foregroundStyle(Theme.Colors.ember)
+                .shadow(color: Chrome.moltenInk, radius: 0, x: 3, y: 4)
                 .shadow(color: Theme.Colors.lava.opacity(0.8), radius: 30)
                 .id(value)
                 .transition(.scale(scale: 1.6).combined(with: .opacity))
@@ -96,12 +111,10 @@ struct PauseOverlay: View {
     var body: some View {
         OverlayScrim {
             VStack(spacing: 16) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(Theme.emberGradient)
                 Text("Paused")
-                    .font(.display(28))
-                    .foregroundStyle(Theme.Colors.textPrimary)
+                    .font(.display(30))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.Colors.ember)
                 Text("Score so far: \(Formatters.integer(score))")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -118,12 +131,13 @@ struct PauseOverlay: View {
                 .buttonStyle(GhostButtonStyle())
                 .accessibilityIdentifier(AccessibilityID.Game.restartButton)
 
-                Button("Quit to camp", action: onQuit)
+                Button(action: onQuit) {
+                    Label("Quit to camp", systemImage: "house.fill")
+                }
                     .buttonStyle(GhostButtonStyle())
                     .accessibilityIdentifier(AccessibilityID.Game.quitButton)
             }
-            .padding(26)
-            .cardBackground()
+            .steleBackground()
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(AccessibilityID.Game.pausedOverlay)
         }
@@ -149,7 +163,8 @@ struct GameOverView: View {
                 VStack(spacing: 6) {
                     Text(outcome.isNewBest ? "NEW BEST!" : "The mountain wins")
                         .font(.display(outcome.isNewBest ? 30 : 26, weight: .black))
-                        .foregroundStyle(outcome.isNewBest ? AnyShapeStyle(Theme.emberGradient) : AnyShapeStyle(Theme.Colors.textPrimary))
+                        .textCase(.uppercase)
+                        .foregroundStyle(Theme.Colors.ember)
                         .shadow(color: outcome.isNewBest ? Theme.Colors.lava.opacity(0.7) : .clear, radius: 16)
                     Text(Formatters.integer(outcome.summary.score))
                         .font(.display(56, weight: .black))
@@ -164,10 +179,12 @@ struct GameOverView: View {
                 }
 
                 LazyVGrid(columns: columns, spacing: 10) {
-                    ResultTile(title: "Embers", value: "+\(Formatters.integer(outcome.summary.embersCollected))", systemImage: "flame.fill", tint: Theme.Colors.ember)
-                    ResultTile(title: "Survived", value: Formatters.duration(outcome.summary.duration), systemImage: "timer", tint: Color(red: 0.6, green: 0.8, blue: 1.0))
-                    ResultTile(title: "Dodged", value: Formatters.integer(outcome.summary.bouldersDodged), systemImage: "figure.run", tint: Theme.Colors.success)
-                    ResultTile(title: "Balance", value: Formatters.integer(outcome.totalEmbers), systemImage: "bag.fill", tint: Color(red: 0.8, green: 0.6, blue: 1.0))
+                    ResultTile(title: "Embers", value: "+\(Formatters.integer(outcome.summary.embersCollected))", art: Art.emberIcon)
+                    ResultTile(title: "Survived", value: Formatters.duration(outcome.summary.duration), systemImage: "timer")
+                    ResultTile(title: "Dodged", value: Formatters.integer(outcome.summary.bouldersDodged), art: Art.boulder(variant: 0, hot: false))
+                    ResultTile(title: "Balance", value: Formatters.integer(outcome.totalEmbers), art: Art.upgrade(.fortune))
+                    ResultTile(title: "Heart shards", value: Formatters.integer(outcome.summary.heartShards), art: Art.HUD.shard)
+                    ResultTile(title: "On crust", value: Formatters.duration(outcome.summary.crustTime), art: Art.HUD.crust)
                 }
 
                 Button(action: onPlayAgain) {
@@ -188,8 +205,7 @@ struct GameOverView: View {
                     .accessibilityIdentifier(AccessibilityID.Game.quitButton)
                 }
             }
-            .padding(24)
-            .cardBackground(isHighlighted: outcome.isNewBest)
+            .steleBackground(isGlowing: outcome.isNewBest)
             .scaleEffect(revealed ? 1 : 0.9)
             .opacity(revealed ? 1 : 0)
             .accessibilityElement(children: .contain)
@@ -206,16 +222,12 @@ struct GameOverView: View {
 private struct ResultTile: View {
     let title: String
     let value: String
-    let systemImage: String
-    let tint: Color
+    var art: String?
+    var systemImage = "circle"
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(tint)
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(tint.opacity(0.16)))
+            TileIcon(art: art, systemImage: systemImage, size: 30)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.display(17))
@@ -229,7 +241,7 @@ private struct ResultTile: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(.white.opacity(0.06)))
+        .background(NineSlice(piece: Chrome.chip, scale: 0.7))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title): \(value)")
     }

@@ -26,7 +26,11 @@ final class VolcanoScene: SKScene {
     private var hero: HeroNode
     private var boulders: [BoulderNode] = []
     private var embers: [EmberNode] = []
+    private var shards: [HeartShardNode] = []
     private var riverNode: LavaRiverNode?
+    private var crustNode: CrustNode?
+    private var craterBurst: SKSpriteNode?
+    private var lastBurstTime: TimeInterval = 0
 
     private var background: SKSpriteNode?
     private var craterGlow: SKSpriteNode?
@@ -84,20 +88,23 @@ final class VolcanoScene: SKScene {
         layout = SceneryBuilder.layout(for: newSize)
 
         background?.removeFromParent()
-        let sky = SceneryBuilder.makeBackground(size: newSize)
+        let sky = SceneryBuilder.makeSky(for: session.mood, size: newSize)
         addChild(sky)
         background = sky
 
         scenery.forEach { $0.removeFromParent() }
         let glow = SceneryBuilder.makeCraterGlow(at: layout.craterPoint, sceneSize: newSize)
         craterGlow = glow
+        let burst = SceneryBuilder.makeCraterBurst(at: layout.craterPoint)
+        craterBurst = burst
         scenery = [
             glow,
             SceneryBuilder.makeMountain(size: newSize, crater: layout.craterPoint),
             SceneryBuilder.makeCraterSmoke(at: layout.craterPoint),
             SceneryBuilder.makeSparks(at: layout.craterPoint),
+            burst,
             SceneryBuilder.makeAsh(size: newSize),
-            SceneryBuilder.makeGround(size: newSize, heroY: layout.heroY)
+            SceneryBuilder.makeGround(size: newSize, groundTop: layout.groundTop)
         ]
         scenery.forEach { world.addChild($0) }
         applyMoodTint(animated: false)
@@ -111,10 +118,13 @@ final class VolcanoScene: SKScene {
             hero.position = CGPoint(x: clampedX, y: layout.heroY)
         }
 
-        // Rebuild the river for the new width if one is active.
+        // Rebuild the river and crust for the new width if one is active.
         riverNode?.removeFromParent()
         riverNode = nil
+        crustNode?.removeFromParent()
+        crustNode = nil
         syncRiverNode()
+        syncCrustNode()
         targetX = nil
     }
 
@@ -152,6 +162,7 @@ final class VolcanoScene: SKScene {
         let dt = min(max(currentTime - last, 0), 1.0 / 20.0)
         guard dt > 0 else { return }
 
+        session.updateHeroPosition(normalizedX: Double(hero.position.x / max(size.width, 1)))
         let tick = session.advance(by: dt)
         for _ in 0..<tick.bouldersToSpawn {
             spawnBoulder()
@@ -166,12 +177,17 @@ final class VolcanoScene: SKScene {
         if tick.lavaStartedFlowing {
             gameDelegate?.scene(self, didRegister: .lavaStarted)
         }
+        if tick.crustFormed {
+            gameDelegate?.scene(self, didRegister: .crustFormed)
+        }
 
         moveHero(dt: dt)
         applyMagnet()
         cullBoulders()
         cullEmbers()
+        updateShards()
         syncRiverNode()
+        syncCrustNode()
         checkLava()
         fireShockwaveIfReady()
 
@@ -245,14 +261,51 @@ final class VolcanoScene: SKScene {
 
         let width = CGFloat(river.end - river.start) * size.width
         if riverNode == nil {
-            let groundTop = layout.heroY - HeroNode.bodyRadius - 10
-            let node = LavaRiverNode(width: width, groundHeight: groundTop)
+            let node = LavaRiverNode(width: width, groundHeight: layout.groundTop)
             node.position = CGPoint(x: CGFloat(river.start) * size.width, y: 0)
             world.addChild(node)
             riverNode = node
         }
         if river.phase == .flowing, riverNode?.phase == .warning {
             riverNode?.startFlowing(width: width)
+        }
+    }
+
+    /// Obsidian crust: mirror the cooled strip a drained river leaves behind.
+    private func syncCrustNode() {
+        guard let crust = session.crust else {
+            if let node = crustNode {
+                node.crumble()
+                crustNode = nil
+            }
+            return
+        }
+        if crustNode == nil {
+            let node = CrustNode(width: CGFloat(crust.end - crust.start) * size.width, groundHeight: layout.groundTop)
+            node.position = CGPoint(x: CGFloat(crust.start) * size.width, y: 0)
+            world.addChild(node)
+            crustNode = node
+        }
+        crustNode?.setActive(session.isOnCrust)
+    }
+
+    /// Heart shards: drop one where a hot boulder was smashed, if the cooldown allows.
+    private func dropShardIfEarned(from boulder: BoulderNode) {
+        guard boulder.isHot, session.registerHotSmash() else { return }
+        let shard = HeartShardNode()
+        shard.position = CGPoint(
+            x: min(max(boulder.position.x, horizontalMargin), size.width - horizontalMargin),
+            y: max(boulder.position.y, layout.heroY)
+        )
+        shard.physicsBody?.velocity = CGVector(dx: CGFloat.random(in: -40...40), dy: 160)
+        world.addChild(shard)
+        shards.append(shard)
+    }
+
+    private func updateShards() {
+        shards.removeAll { $0.parent == nil || $0.isCollected }
+        for shard in shards {
+            shard.settle(onGroundAt: layout.heroY)
         }
     }
 
@@ -269,9 +322,10 @@ final class VolcanoScene: SKScene {
         guard session.consumeShockwave() else { return }
         let radius = max(size.width, size.height) * 0.75
         var smashed = 0
-        for boulder in boulders where boulder.parent != nil {
+        for boulder in boulders where boulder.parent != nil && boulder.physicsBody != nil {
             let distance = hypot(boulder.position.x - hero.position.x, boulder.position.y - hero.position.y)
             if distance <= radius {
+                dropShardIfEarned(from: boulder)
                 boulder.shatter()
                 smashed += 1
             }
@@ -284,8 +338,18 @@ final class VolcanoScene: SKScene {
         publishHUD()
     }
 
-    /// Moods: tint the crater glow to telegraph the current phase.
+    /// Moods: swap the painted sky and tint the crater glow to telegraph the current phase.
     private func applyMoodTint(animated: Bool) {
+        if animated, let old = background {
+            let sky = SceneryBuilder.makeSky(for: session.mood, size: size)
+            sky.alpha = 0
+            sky.zPosition = SceneLayer.background + 1
+            addChild(sky)
+            background = sky
+            sky.run(.sequence([.fadeIn(withDuration: 0.8), .run { sky.zPosition = SceneLayer.background }]))
+            old.run(.sequence([.wait(forDuration: 0.8), .removeFromParent()]))
+            playCraterBurst(force: true)
+        }
         guard let craterGlow else { return }
         let color: UIColor
         switch session.mood {
@@ -325,9 +389,12 @@ final class VolcanoScene: SKScene {
             let crater = layout.craterPoint
             boulder.position = CGPoint(x: crater.x + CGFloat.random(in: -14...14), y: crater.y)
             body.affectedByGravity = true
+            playCraterBurst(force: false)
 
             let launchSpeed = CGFloat.random(in: 240...500) * multiplier
-            let isAimed = Double.random(in: 0..<1) < session.mood.aimedProbability
+            // Aim ramps in over the first half minute so new players can find their feet.
+            let aimRamp = 0.35 + 0.65 * min(1, session.elapsed / 30)
+            let isAimed = Double.random(in: 0..<1) < session.mood.aimedProbability * aimRamp
             let targetX: CGFloat = isAimed
                 ? hero.position.x + CGFloat.random(in: -90...90)
                 : CGFloat.random(in: horizontalMargin...(size.width - horizontalMargin))
@@ -345,6 +412,17 @@ final class VolcanoScene: SKScene {
         body.angularVelocity = CGFloat.random(in: -5...5)
         world.addChild(boulder)
         boulders.append(boulder)
+    }
+
+    /// Plays the painted lava splash over the crater, at most a few times per second.
+    private func playCraterBurst(force: Bool) {
+        guard let craterBurst else { return }
+        let now = session.elapsed
+        guard force || now - lastBurstTime > 0.6 else { return }
+        lastBurstTime = now
+        craterBurst.removeAction(forKey: "burst")
+        craterBurst.setScale(CGFloat.random(in: 0.85...1.15))
+        craterBurst.run(SceneryBuilder.burstAction, withKey: "burst")
     }
 
     private func spawnEmber() {
@@ -385,6 +463,10 @@ final class VolcanoScene: SKScene {
                     session.registerDodge()
                 }
             }
+            if boulder.hasBeenDodged, boulder.position.y - boulder.radius * 0.4 < layout.groundTop {
+                boulder.shatter()
+                return true
+            }
             let outOfBounds = boulder.position.y < -boulder.radius * 2 - 40
                 || boulder.position.x < -size.width * 0.3
                 || boulder.position.x > size.width * 1.3
@@ -410,7 +492,11 @@ final class VolcanoScene: SKScene {
     // MARK: - Collisions
 
     private func handleBoulderHit(_ boulder: BoulderNode) {
+        guard boulder.physicsBody != nil else { return }
         let outcome = session.registerBoulderHit()
+        if outcome == .overdriveSmash {
+            dropShardIfEarned(from: boulder)
+        }
         boulder.shatter()
         handle(outcome: outcome)
     }
@@ -440,6 +526,22 @@ final class VolcanoScene: SKScene {
         ember.collect()
         session.registerEmberPickup()
         gameDelegate?.scene(self, didRegister: .emberCollected)
+        publishHUD()
+    }
+
+    private func handleShardPickup(_ shard: HeartShardNode) {
+        guard !shard.isCollected else { return }
+        shard.collect()
+        switch session.registerShardPickup() {
+        case .stored:
+            gameDelegate?.scene(self, didRegister: .shardCollected)
+        case .heartRestored:
+            hero.playHeal()
+            gameDelegate?.scene(self, didRegister: .heartRestored)
+        case .bonusEmbers:
+            hero.playHeal()
+            gameDelegate?.scene(self, didRegister: .emberCollected)
+        }
         publishHUD()
     }
 
@@ -505,6 +607,8 @@ extension VolcanoScene: SKPhysicsContactDelegate {
             handleBoulderHit(boulder)
         } else if let ember = nodes.compactMap({ $0 as? EmberNode }).first {
             handleEmberPickup(ember)
+        } else if let shard = nodes.compactMap({ $0 as? HeartShardNode }).first {
+            handleShardPickup(shard)
         }
     }
 }

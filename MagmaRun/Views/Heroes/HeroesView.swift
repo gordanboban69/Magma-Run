@@ -1,38 +1,49 @@
 import SwiftUI
 
-/// Hero gallery: preview, unlock and equip skins.
+/// Hero hall: a large showcase of one runner on a pedestal, with a roster of portraits below.
 struct HeroesView: View {
     @State private var viewModel: HeroesViewModel
+    /// The hero shown in the showcase. Starts on the equipped one.
+    @State private var previewed: HeroSkin?
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     init(viewModel: HeroesViewModel) {
         self.viewModel = viewModel
     }
 
-    private var columns: [GridItem] {
-        let count = sizeClass == .regular ? 3 : 2
-        return Array(repeating: GridItem(.flexible(), spacing: 14), count: count)
+    private var isRegular: Bool { sizeClass == .regular }
+
+    private var selected: HeroSkin {
+        previewed ?? HeroSkin.allCases.first { viewModel.status(of: $0) == .equipped } ?? .starter
     }
 
     var body: some View {
         @Bindable var viewModel = viewModel
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 HStack {
-                    SectionHeader(title: "Choose your runner", subtitle: "Every hero plays the same. Pick the one that feels like you.")
+                    Text("Every hero plays the same. Pick the one that feels like you.")
+                        .font(.system(size: 13, weight: .medium, design: .serif))
+                        .italic()
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     EmberBadge(amount: viewModel.embers)
                 }
-                LazyVGrid(columns: columns, spacing: 14) {
-                    ForEach(HeroSkin.allCases) { skin in
-                        HeroCard(
-                            skin: skin,
-                            status: viewModel.status(of: skin),
-                            canAfford: viewModel.canUnlock(skin),
-                            shakeTrigger: viewModel.shakeCounts[skin] ?? 0,
-                            onActivate: { viewModel.activate(skin) }
-                        )
-                    }
-                }
+
+                HeroShowcase(
+                    skin: selected,
+                    status: viewModel.status(of: selected),
+                    canAfford: viewModel.canUnlock(selected),
+                    shakeTrigger: viewModel.shakeCounts[selected] ?? 0,
+                    heroSize: isRegular ? 280 : 210,
+                    onActivate: { viewModel.activate(selected) }
+                )
+                .id(selected)
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+
+                FlameDivider()
+
+                roster
             }
             .frame(maxWidth: Theme.Metrics.maxContentWidth)
             .frame(maxWidth: .infinity)
@@ -41,66 +52,91 @@ struct HeroesView: View {
         }
         .scrollIndicators(.hidden)
         .background(VolcanoBackdrop(emberCount: 16))
-        .navigationTitle("Heroes")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .stoneNavigation("Hall of Runners")
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.Heroes.screen)
     }
+
+    private var roster: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: isRegular ? 6 : 3)
+        return LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(HeroSkin.allCases) { skin in
+                RosterPortrait(
+                    skin: skin,
+                    status: viewModel.status(of: skin),
+                    isSelected: skin == selected
+                ) {
+                    withAnimation(.spring(duration: 0.35)) {
+                        previewed = skin
+                    }
+                }
+            }
+        }
+    }
 }
 
-private struct HeroCard: View {
+/// The selected hero standing on the pedestal, with lore and the unlock / equip slab.
+private struct HeroShowcase: View {
     let skin: HeroSkin
     let status: HeroesViewModel.Status
     let canAfford: Bool
     let shakeTrigger: Int
+    let heroSize: CGFloat
     let onActivate: () -> Void
-
-    private var isEquipped: Bool { status == .equipped }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            ZStack(alignment: .topTrailing) {
-                HeroAvatarView(skin: skin, size: 110)
-                    .frame(maxWidth: .infinity)
-                    .saturation(isLocked ? 0.15 : 1)
-                    .opacity(isLocked ? 0.7 : 1)
-                if isEquipped {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Theme.Colors.success)
-                        .transition(.scale.combined(with: .opacity))
-                } else if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                }
-            }
-            Text(skin.title)
-                .font(.display(16))
-                .foregroundStyle(Theme.Colors.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(skin.lore)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(Theme.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2, reservesSpace: true)
-            actionButton
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity)
-        .cardBackground(isHighlighted: isEquipped)
-        .shake(trigger: shakeTrigger)
-        .animation(.spring(duration: 0.35), value: status)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(AccessibilityID.Heroes.heroCard(skin.id))
-    }
 
     private var isLocked: Bool {
         if case .locked = status { return true }
         return false
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ZStack(alignment: .bottom) {
+                Image(Chrome.pedestal)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: heroSize * 1.1)
+                    .offset(y: heroSize * 0.12)
+                HeroAvatarView(skin: skin, size: heroSize)
+                    .saturation(isLocked ? 0.1 : 1)
+                    .brightness(isLocked ? -0.15 : 0)
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(Theme.Colors.ash)
+                        .frame(width: 48, height: 48)
+                        .background(Image(Chrome.roundButton).resizable())
+                        .offset(x: heroSize * 0.38, y: -heroSize * 0.75)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(.bottom, heroSize * 0.1)
+
+            StonePlaque {
+                Text(skin.title)
+                    .font(.display(24))
+                    .textCase(.uppercase)
+                    .foregroundStyle(Theme.Colors.ember)
+            }
+
+            Text(skin.lore)
+                .font(.system(size: 14, weight: .medium, design: .serif))
+                .italic()
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            actionButton
+                .frame(maxWidth: 300)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity)
+        .cardBackground(isHighlighted: status == .equipped)
+        .shake(trigger: shakeTrigger)
+        .animation(.spring(duration: 0.35), value: status)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(AccessibilityID.Heroes.heroCard(skin.id))
     }
 
     @ViewBuilder
@@ -108,29 +144,97 @@ private struct HeroCard: View {
         switch status {
         case .equipped:
             Text("EQUIPPED")
-                .font(.display(12, weight: .black))
+                .font(.display(16))
+                .tracking(1)
                 .foregroundStyle(Theme.Colors.success)
-                .padding(.vertical, 9)
-                .frame(maxWidth: .infinity)
-                .background(Capsule().strokeBorder(Theme.Colors.success.opacity(0.6), lineWidth: 1.5))
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .background(NineSlice(piece: Chrome.stonePressed, scale: 0.9))
                 .accessibilityIdentifier(AccessibilityID.Heroes.heroAction(skin.id))
         case .unlocked:
-            Button("Select", action: onActivate)
-                .buttonStyle(CompactLavaButtonStyle())
-                .frame(maxWidth: .infinity)
+            Button("Equip", action: onActivate)
+                .buttonStyle(LavaButtonStyle(isProminent: false))
                 .accessibilityIdentifier(AccessibilityID.Heroes.heroAction(skin.id))
         case .locked(let price):
             Button(action: onActivate) {
-                HStack(spacing: 5) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 11, weight: .bold))
+                HStack(spacing: 8) {
+                    Text("Unlock")
+                    EmberGlyph(size: 16, onMolten: true)
                     Text(Formatters.integer(price))
                 }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(CompactLavaButtonStyle(isEnabledLook: canAfford))
+            .buttonStyle(LavaButtonStyle(isProminent: canAfford))
+            .opacity(canAfford ? 1 : 0.75)
             .accessibilityLabel("Unlock \(skin.title) for \(price) embers")
             .accessibilityIdentifier(AccessibilityID.Heroes.heroAction(skin.id))
         }
+    }
+}
+
+/// A roster thumbnail on a small tablet; the selected one glows with molten seams.
+private struct RosterPortrait: View {
+    let skin: HeroSkin
+    let status: HeroesViewModel.Status
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    private var isLocked: Bool {
+        if case .locked = status { return true }
+        return false
+    }
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(spacing: 4) {
+                Image(Art.heroPortrait(skin))
+                    .resizable()
+                    .scaledToFit()
+                    .saturation(isLocked ? 0 : 1)
+                    .opacity(isLocked ? 0.55 : 1)
+                    .padding(6)
+                HStack(spacing: 4) {
+                    switch status {
+                    case .equipped:
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(Theme.Colors.success)
+                        Text("Equipped")
+                    case .unlocked:
+                        Text("Owned")
+                    case .locked(let price):
+                        EmberGlyph(size: 15)
+                        Text(Formatters.integer(price))
+                    }
+                }
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .frame(height: 14)
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .cardBackground(cornerRadius: Theme.Metrics.smallCornerRadius, isHighlighted: isSelected)
+            .overlay(alignment: .topTrailing) {
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundStyle(Theme.Colors.ash)
+                        .frame(width: 26, height: 26)
+                        .background(Image(Chrome.roundButton).resizable())
+                        .padding(6)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .buttonStyle(RosterPressStyle())
+        .accessibilityLabel("\(skin.title)\(isLocked ? ", locked" : "")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("heroes.thumb.\(skin.id)")
+    }
+}
+
+private struct RosterPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .offset(y: configuration.isPressed ? 2 : 0)
+            .brightness(configuration.isPressed ? -0.06 : 0)
     }
 }

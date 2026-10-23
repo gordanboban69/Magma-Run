@@ -16,6 +16,14 @@ enum ControlScheme: String, CaseIterable, Identifiable, Codable, Sendable {
         }
     }
 
+    /// Short label for the settings switcher.
+    var shortTitle: String {
+        switch self {
+        case .drag: "Drag"
+        case .buttons: "Buttons"
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .drag: "hand.draw.fill"

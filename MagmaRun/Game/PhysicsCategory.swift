@@ -6,6 +6,7 @@ enum PhysicsCategory {
     static let hero: UInt32 = 1 << 0
     static let boulder: UInt32 = 1 << 1
     static let ember: UInt32 = 1 << 2
+    static let shard: UInt32 = 1 << 3
 }
 
 /// Rendering order of the scene layers.

@@ -39,10 +39,15 @@ struct RunSessionTests {
     @Test func bouldersSpawnOnSchedule() {
         var session = RunSession(loadout: .starter)
         var spawned = 0
+        // The opening breather keeps the first second clear of rocks.
         for _ in 0..<60 {
             spawned += session.advance(by: 1.0 / 60.0).bouldersToSpawn
         }
-        // Within the first second the pre-shortened initial delay must have fired once.
+        #expect(spawned == 0)
+        // By three seconds the first launches have fired.
+        for _ in 0..<120 {
+            spawned += session.advance(by: 1.0 / 60.0).bouldersToSpawn
+        }
         #expect(spawned >= 1)
         #expect(spawned <= 2)
     }

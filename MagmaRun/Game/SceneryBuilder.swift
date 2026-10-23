@@ -1,35 +1,34 @@
 import SpriteKit
 
-/// Builds the static backdrop: sky, mountain, crater glow, ash and the ground fissure.
-/// Everything is drawn procedurally and rebuilt when the scene size changes.
+/// Builds the backdrop from the generated art: mood skies, the volcano, crater effects,
+/// ash and the ground strip. Rebuilt when the scene size changes.
 @MainActor
 enum SceneryBuilder {
     struct Layout {
         let craterPoint: CGPoint
         let heroY: CGFloat
+
+        /// Top edge of the ground strip the hero runs along.
+        var groundTop: CGFloat { heroY - HeroNode.bodyRadius - 10 }
     }
 
     /// Computes key positions for a given scene size.
     static func layout(for size: CGSize) -> Layout {
-        let craterY = size.height * 0.82
+        // Low enough that the HUD score panel never hides boulders leaving the crater.
+        let craterY = size.height * 0.75
         // Keep the hero above the home indicator and on-screen controls.
         let heroY = max(size.height * 0.16, 130)
         return Layout(craterPoint: CGPoint(x: size.width / 2, y: craterY), heroY: heroY)
     }
 
-    static func makeBackground(size: CGSize) -> SKSpriteNode {
-        let texture = TextureFactory.verticalGradient(
-            size: CGSize(width: 8, height: 256),
-            colors: [
-                UIColor(red: 0.04, green: 0.02, blue: 0.06, alpha: 1),
-                UIColor(red: 0.12, green: 0.04, blue: 0.08, alpha: 1),
-                UIColor(red: 0.30, green: 0.09, blue: 0.10, alpha: 1)
-            ],
-            key: "sky"
-        )
-        let node = SKSpriteNode(texture: texture, size: size)
-        node.anchorPoint = .zero
-        node.position = .zero
+    /// A full-screen sky for the given mood, scaled to fill like `scaledToFill`.
+    static func makeSky(for mood: VolcanoMood, size: CGSize) -> SKSpriteNode {
+        let texture = TextureFactory.named(Art.sky(mood))
+        let textureSize = texture.size()
+        let scale = max(size.width / max(textureSize.width, 1), size.height / max(textureSize.height, 1))
+        let node = SKSpriteNode(texture: texture)
+        node.size = CGSize(width: textureSize.width * scale, height: textureSize.height * scale)
+        node.position = CGPoint(x: size.width / 2, y: size.height / 2)
         node.zPosition = SceneLayer.background
         return node
     }
@@ -42,104 +41,57 @@ enum SceneryBuilder {
         glow.color = UIColor(red: 1.0, green: 0.40, blue: 0.10, alpha: 1)
         glow.colorBlendFactor = 1
         glow.blendMode = .add
-        glow.alpha = 0.55
+        glow.alpha = 0.5
         glow.zPosition = SceneLayer.craterGlow
         let pulse = SKAction.sequence([
-            .fadeAlpha(to: 0.35, duration: 1.4),
-            .fadeAlpha(to: 0.65, duration: 1.4)
+            .fadeAlpha(to: 0.3, duration: 1.4),
+            .fadeAlpha(to: 0.6, duration: 1.4)
         ])
         pulse.timingMode = .easeInEaseOut
         glow.run(.repeatForever(pulse))
         return glow
     }
 
-    /// The volcano silhouette: the hero stands at its foot, so the slope fills the screen below the crater.
-    static func makeMountain(size: CGSize, crater: CGPoint) -> SKNode {
-        let container = SKNode()
-        container.zPosition = SceneLayer.mountain
+    /// The painted volcano, anchored so its crater sits exactly on `crater`.
+    static func makeMountain(size: CGSize, crater: CGPoint) -> SKSpriteNode {
+        let texture = TextureFactory.named(Art.volcano)
+        let art = Art.volcanoSize
+        // Wide enough for the screen and tall enough to reach the bottom edge.
+        let scale = max(size.width / art.width, crater.y / (art.height - Art.volcanoCrater.y))
+        let node = SKSpriteNode(texture: texture)
+        node.size = CGSize(width: art.width * scale, height: art.height * scale)
+        node.anchorPoint = CGPoint(x: Art.volcanoCrater.x / art.width, y: 1 - Art.volcanoCrater.y / art.height)
+        node.position = crater
+        node.zPosition = SceneLayer.mountain
+        return node
+    }
 
-        let topHalfWidth = max(size.width * 0.12, 46)
-        let baseHalfWidth = size.width * 0.95
-        let baseY: CGFloat = -40
+    /// Animated lava splash above the crater. Call `run(burstAction)` to play it.
+    static func makeCraterBurst(at point: CGPoint) -> SKSpriteNode {
+        let frames = TextureFactory.frames(Art.craterBurstFrames)
+        let node = SKSpriteNode(texture: frames.first)
+        node.size = CGSize(width: 120, height: 90)
+        node.anchorPoint = CGPoint(x: 0.5, y: 0.08)
+        node.position = point
+        node.zPosition = SceneLayer.mountain + 3
+        node.alpha = 0
+        return node
+    }
 
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: crater.x - baseHalfWidth, y: baseY))
-        // Left slope with jagged shoulders.
-        path.addLine(to: CGPoint(x: crater.x - baseHalfWidth * 0.78, y: crater.y * 0.28))
-        path.addLine(to: CGPoint(x: crater.x - baseHalfWidth * 0.62, y: crater.y * 0.42))
-        path.addLine(to: CGPoint(x: crater.x - baseHalfWidth * 0.5, y: crater.y * 0.52))
-        path.addLine(to: CGPoint(x: crater.x - baseHalfWidth * 0.3, y: crater.y * 0.74))
-        path.addLine(to: CGPoint(x: crater.x - topHalfWidth * 1.4, y: crater.y * 0.93))
-        path.addLine(to: CGPoint(x: crater.x - topHalfWidth, y: crater.y))
-        // Crater dip.
-        path.addLine(to: CGPoint(x: crater.x - topHalfWidth * 0.5, y: crater.y - 10))
-        path.addLine(to: CGPoint(x: crater.x + topHalfWidth * 0.5, y: crater.y - 10))
-        path.addLine(to: CGPoint(x: crater.x + topHalfWidth, y: crater.y))
-        // Right slope.
-        path.addLine(to: CGPoint(x: crater.x + topHalfWidth * 1.5, y: crater.y * 0.9))
-        path.addLine(to: CGPoint(x: crater.x + baseHalfWidth * 0.34, y: crater.y * 0.7))
-        path.addLine(to: CGPoint(x: crater.x + baseHalfWidth * 0.48, y: crater.y * 0.56))
-        path.addLine(to: CGPoint(x: crater.x + baseHalfWidth * 0.66, y: crater.y * 0.4))
-        path.addLine(to: CGPoint(x: crater.x + baseHalfWidth * 0.8, y: crater.y * 0.26))
-        path.addLine(to: CGPoint(x: crater.x + baseHalfWidth, y: baseY))
-        path.closeSubpath()
-
-        let mountain = SKShapeNode(path: path)
-        mountain.fillColor = UIColor(red: 0.11, green: 0.06, blue: 0.09, alpha: 1)
-        mountain.strokeColor = UIColor(red: 0.35, green: 0.14, blue: 0.12, alpha: 0.9)
-        mountain.lineWidth = 2
-        container.addChild(mountain)
-
-        // Lava streams running down from the crater.
-        let streamColor = UIColor(red: 1.0, green: 0.42, blue: 0.12, alpha: 1)
-        let streams: [[CGPoint]] = [
-            [CGPoint(x: crater.x - topHalfWidth * 0.6, y: crater.y - 8),
-             CGPoint(x: crater.x - topHalfWidth * 1.6, y: crater.y * 0.84),
-             CGPoint(x: crater.x - topHalfWidth * 1.3, y: crater.y * 0.72),
-             CGPoint(x: crater.x - baseHalfWidth * 0.3, y: crater.y * 0.5)],
-            [CGPoint(x: crater.x + topHalfWidth * 0.4, y: crater.y - 8),
-             CGPoint(x: crater.x + topHalfWidth * 1.1, y: crater.y * 0.8),
-             CGPoint(x: crater.x + topHalfWidth * 2.0, y: crater.y * 0.62),
-             CGPoint(x: crater.x + baseHalfWidth * 0.36, y: crater.y * 0.46)],
-            [CGPoint(x: crater.x, y: crater.y - 10),
-             CGPoint(x: crater.x + topHalfWidth * 0.3, y: crater.y * 0.78),
-             CGPoint(x: crater.x - topHalfWidth * 0.2, y: crater.y * 0.6)]
-        ]
-        for (index, points) in streams.enumerated() {
-            let streamPath = CGMutablePath()
-            streamPath.addLines(between: points)
-            let stream = SKShapeNode(path: streamPath)
-            stream.strokeColor = streamColor
-            stream.lineWidth = index == 2 ? 3 : 4
-            stream.lineCap = .round
-            stream.lineJoin = .round
-            stream.glowWidth = 6
-            stream.alpha = 0.85
-            let flicker = SKAction.sequence([
-                .fadeAlpha(to: 0.55, duration: Double.random(in: 0.6...1.1)),
-                .fadeAlpha(to: 0.95, duration: Double.random(in: 0.6...1.1))
-            ])
-            stream.run(.repeatForever(flicker))
-            container.addChild(stream)
-        }
-
-        // Molten crater rim.
-        let rim = SKShapeNode(ellipseOf: CGSize(width: topHalfWidth * 2.1, height: 16))
-        rim.position = CGPoint(x: crater.x, y: crater.y - 4)
-        rim.fillColor = UIColor(red: 1.0, green: 0.55, blue: 0.15, alpha: 1)
-        rim.strokeColor = UIColor(red: 1.0, green: 0.8, blue: 0.4, alpha: 1)
-        rim.lineWidth = 2
-        rim.glowWidth = 10
-        container.addChild(rim)
-
-        return container
+    static var burstAction: SKAction {
+        let frames = TextureFactory.frames(Art.craterBurstFrames)
+        return .sequence([
+            .fadeIn(withDuration: 0.04),
+            .animate(with: frames, timePerFrame: 0.09, resize: false, restore: false),
+            .fadeOut(withDuration: 0.12)
+        ])
     }
 
     static func makeCraterSmoke(at point: CGPoint) -> SKEmitterNode {
         let smoke = SKEmitterNode()
         smoke.particleTexture = TextureFactory.softCircle(diameter: 64)
         smoke.position = CGPoint(x: point.x, y: point.y + 6)
-        smoke.particleBirthRate = 14
+        smoke.particleBirthRate = 12
         smoke.particleLifetime = 3.2
         smoke.particleLifetimeRange = 1
         smoke.particlePositionRange = CGVector(dx: 30, dy: 4)
@@ -150,9 +102,9 @@ enum SceneryBuilder {
         smoke.particleScale = 0.9
         smoke.particleScaleRange = 0.4
         smoke.particleScaleSpeed = 0.7
-        smoke.particleAlpha = 0.45
-        smoke.particleAlphaSpeed = -0.15
-        smoke.particleColor = UIColor(red: 0.45, green: 0.3, blue: 0.3, alpha: 1)
+        smoke.particleAlpha = 0.4
+        smoke.particleAlphaSpeed = -0.13
+        smoke.particleColor = UIColor(red: 0.42, green: 0.3, blue: 0.32, alpha: 1)
         smoke.particleColorBlendFactor = 1
         smoke.zPosition = SceneLayer.mountain + 1
         return smoke
@@ -203,36 +155,40 @@ enum SceneryBuilder {
         return ash
     }
 
-    /// A glowing fissure marking the ground the hero runs along.
-    static func makeGround(size: CGSize, heroY: CGFloat) -> SKNode {
+    /// The basalt strip the hero runs along, tiled from `ground_tile`.
+    static func makeGround(size: CGSize, groundTop: CGFloat) -> SKNode {
         let container = SKNode()
         container.zPosition = SceneLayer.ground
-
-        let groundY = heroY - HeroNode.bodyRadius - 10
-        let ground = SKShapeNode(rect: CGRect(x: -20, y: -60, width: size.width + 40, height: groundY + 60))
-        ground.fillColor = UIColor(red: 0.07, green: 0.04, blue: 0.06, alpha: 1)
-        ground.strokeColor = .clear
-        container.addChild(ground)
-
-        let fissure = CGMutablePath()
-        fissure.move(to: CGPoint(x: -10, y: groundY))
-        var x: CGFloat = 0
-        var up = true
-        while x < size.width + 20 {
-            x += CGFloat.random(in: 18...42)
-            let y = groundY + (up ? CGFloat.random(in: 2...6) : -CGFloat.random(in: 2...6))
-            fissure.addLine(to: CGPoint(x: x, y: y))
-            up.toggle()
-        }
-        let crack = SKShapeNode(path: fissure)
-        crack.strokeColor = UIColor(red: 1.0, green: 0.45, blue: 0.12, alpha: 1)
-        crack.lineWidth = 2.5
-        crack.glowWidth = 7
-        crack.lineJoin = .round
-        let flicker = SKAction.sequence([.fadeAlpha(to: 0.6, duration: 0.9), .fadeAlpha(to: 1, duration: 0.9)])
-        crack.run(.repeatForever(flicker))
-        container.addChild(crack)
-
+        // The tile's glowing fissure sits 8 pt below its top edge.
+        let strip = makeTiledStrip(Art.groundTile, width: size.width + 40, height: groundTop + 8)
+        strip.position = CGPoint(x: -20, y: 0)
+        container.addChild(strip)
         return container
+    }
+
+    /// Repeats a horizontally tileable 200 × 120 bitmap to fill `width` × `height`,
+    /// with the origin at the bottom-left. Tiles keep their painted aspect ratio;
+    /// the last one is cropped so narrow strips are never squashed.
+    static func makeTiledStrip(_ name: String, width: CGFloat, height: CGFloat) -> SKNode {
+        let tiles = SKNode()
+        guard width > 0, height > 0 else { return tiles }
+        let texture = TextureFactory.named(name)
+        let tileWidth = height * (200.0 / 120.0)
+        let count = max(1, Int((width / tileWidth).rounded(.up)))
+        for index in 0..<count {
+            let tile = SKSpriteNode(texture: texture)
+            tile.anchorPoint = .zero
+            // Half a point of overlap hides hairline seams between tiles.
+            tile.size = CGSize(width: tileWidth + 0.5, height: height)
+            tile.position = CGPoint(x: CGFloat(index) * tileWidth, y: 0)
+            tiles.addChild(tile)
+        }
+
+        let crop = SKCropNode()
+        let mask = SKSpriteNode(color: .white, size: CGSize(width: width, height: height))
+        mask.anchorPoint = .zero
+        crop.maskNode = mask
+        crop.addChild(tiles)
+        return crop
     }
 }

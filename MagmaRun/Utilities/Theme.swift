@@ -58,8 +58,10 @@ enum Theme {
 // MARK: - Typography helpers
 
 extension Font {
-    /// Rounded display font used for headlines, scores and big numbers.
+    /// Condensed, chiselled display face used for headlines, scores and big numbers.
+    /// Scales with Dynamic Type relative to the title style. `weight` is kept for call sites
+    /// but the face only ships one weight.
     static func display(_ size: CGFloat, weight: Font.Weight = .heavy) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .custom("Futura-CondensedExtraBold", size: size, relativeTo: size >= 28 ? .largeTitle : .title3)
     }
 }

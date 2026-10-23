@@ -7,13 +7,14 @@ struct LevelPips: View {
     var tint: Color = Theme.Colors.ember
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 2) {
             ForEach(0..<maxLevel, id: \.self) { index in
-                Capsule()
-                    .fill(index < level ? AnyShapeStyle(Theme.emberGradient) : AnyShapeStyle(Color.white.opacity(0.12)))
-                    .frame(width: index < level ? 18 : 14, height: 6)
-                    .shadow(color: index < level ? tint.opacity(0.6) : .clear, radius: 4)
-                    .animation(.spring(duration: 0.35, bounce: 0.4).delay(Double(index) * 0.03), value: level)
+                Image(index < level ? Chrome.socketFull : Chrome.socketEmpty)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .scaleEffect(index < level ? 1 : 0.9)
+                    .animation(.spring(duration: 0.35, bounce: 0.5).delay(Double(index) * 0.04), value: level)
             }
         }
         .accessibilityElement(children: .ignore)

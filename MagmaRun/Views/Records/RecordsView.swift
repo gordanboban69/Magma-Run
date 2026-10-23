@@ -20,10 +20,10 @@ struct RecordsView: View {
         ScrollView {
             VStack(spacing: 24) {
                 LazyVGrid(columns: statColumns, spacing: 12) {
-                    StatTile(title: "Best score", value: Formatters.integer(profile.bestScore), systemImage: "trophy.fill")
-                    StatTile(title: "Runs", value: Formatters.integer(profile.totalRuns), systemImage: "flag.checkered", tint: Theme.Colors.success)
-                    StatTile(title: "Longest run", value: Formatters.duration(profile.longestSurvival), systemImage: "timer", tint: Color(red: 0.6, green: 0.8, blue: 1.0))
-                    StatTile(title: "Embers collected", value: Formatters.integer(profile.totalEmbersCollected), systemImage: "flame.fill", tint: Theme.Colors.lava)
+                    StatTile(title: "Best score", value: Formatters.integer(profile.bestScore), art: Art.Menu.records)
+                    StatTile(title: "Runs", value: Formatters.integer(profile.totalRuns), art: Art.mood(.steady))
+                    StatTile(title: "Longest run", value: Formatters.duration(profile.longestSurvival), systemImage: "timer")
+                    StatTile(title: "Embers collected", value: Formatters.integer(profile.totalEmbersCollected), art: Art.upgrade(.fortune))
                 }
 
                 VStack(spacing: 12) {
@@ -55,9 +55,7 @@ struct RecordsView: View {
         }
         .scrollIndicators(.hidden)
         .background(VolcanoBackdrop(emberCount: 16))
-        .navigationTitle("Records")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .stoneNavigation("Records")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(AccessibilityID.Records.screen)
     }
@@ -93,10 +91,16 @@ private struct AchievementRow: View {
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                ProgressRing(progress: achievement.progress, lineWidth: 3, tint: achievement.isUnlocked ? Theme.Colors.ember : Theme.Colors.ash)
-                    .frame(width: 44, height: 44)
+                Image(achievement.isUnlocked ? Art.badgeEarned : Art.badgeLocked)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 54, height: 54)
+                if !achievement.isUnlocked {
+                    ProgressRing(progress: achievement.progress, lineWidth: 2.5, tint: Theme.Colors.ember)
+                        .frame(width: 30, height: 30)
+                }
                 Image(systemName: achievement.systemImage)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(achievement.isUnlocked ? Theme.Colors.ember : Theme.Colors.textTertiary)
             }
             VStack(alignment: .leading, spacing: 3) {
@@ -150,9 +154,7 @@ private struct RunRow: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Theme.Colors.ember)
+                    EmberGlyph(size: 13)
                     Text("+\(Formatters.integer(run.embersCollected))")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Theme.Colors.textPrimary)

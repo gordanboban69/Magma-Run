@@ -12,18 +12,15 @@ final class EmberNode: SKNode {
         zPosition = SceneLayer.embers
 
         let glow = SKSpriteNode(texture: TextureFactory.softCircle(diameter: 64))
-        glow.size = CGSize(width: 48, height: 48)
+        glow.size = CGSize(width: 46, height: 46)
         glow.color = UIColor(red: 1.0, green: 0.62, blue: 0.15, alpha: 1)
         glow.colorBlendFactor = 1
         glow.blendMode = .add
-        glow.alpha = 0.8
+        glow.alpha = 0.6
         addChild(glow)
 
-        let core = SKShapeNode(circleOfRadius: 7)
-        core.fillColor = UIColor(red: 1.0, green: 0.9, blue: 0.55, alpha: 1)
-        core.strokeColor = UIColor(red: 1.0, green: 0.7, blue: 0.2, alpha: 1)
-        core.lineWidth = 2
-        core.glowWidth = 3
+        let core = SKSpriteNode(texture: TextureFactory.named(Art.ember))
+        core.size = CGSize(width: 34, height: 34)
         addChild(core)
 
         let pulse = SKAction.sequence([
@@ -32,6 +29,9 @@ final class EmberNode: SKNode {
         ])
         pulse.timingMode = .easeInEaseOut
         glow.run(.repeatForever(pulse))
+        let sway = SKAction.sequence([.rotate(toAngle: 0.18, duration: 0.6), .rotate(toAngle: -0.18, duration: 0.6)])
+        sway.timingMode = .easeInEaseOut
+        core.run(.repeatForever(sway))
 
         let body = SKPhysicsBody(circleOfRadius: Self.pickupRadius)
         body.categoryBitMask = PhysicsCategory.ember
@@ -53,7 +53,7 @@ final class EmberNode: SKNode {
         isCollected = true
         physicsBody = nil
         run(.sequence([
-            .group([.scale(to: 1.8, duration: 0.18), .fadeOut(withDuration: 0.18)]),
+            .group([.scale(to: 1.8, duration: 0.18), .fadeOut(withDuration: 0.18), .moveBy(x: 0, y: 18, duration: 0.18)]),
             .removeFromParent()
         ]))
     }

@@ -4,6 +4,8 @@ import SwiftUI
 /// Drawn with `Canvas` inside a `TimelineView` so it costs no view updates.
 struct VolcanoBackdrop: View {
     var emberCount = 28
+    /// Optional painted scene drawn under the embers (scaled to fill).
+    var art: String?
 
     private struct Ember {
         let x: Double
@@ -15,8 +17,9 @@ struct VolcanoBackdrop: View {
 
     private let embers: [Ember]
 
-    init(emberCount: Int = 28) {
+    init(emberCount: Int = 28, art: String? = nil) {
         self.emberCount = emberCount
+        self.art = art
         var generator = SeededGenerator(seed: 42)
         embers = (0..<emberCount).map { _ in
             Ember(
@@ -31,11 +34,27 @@ struct VolcanoBackdrop: View {
 
     var body: some View {
         ZStack {
-            Theme.backgroundGradient
+            Theme.Colors.background
+
+            // Tiled basalt grain instead of a flat gradient.
+            Image(Art.panelTexture)
+                .resizable(resizingMode: .tile)
+                .opacity(0.9)
+
+            if let art {
+                // Measured so a fill-scaled bitmap never widens the layout.
+                GeometryReader { proxy in
+                    Image(art)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                }
+            }
 
             // Warm glow rising from the bottom, like a lava field below the horizon.
             RadialGradient(
-                colors: [Theme.Colors.lava.opacity(0.35), .clear],
+                colors: [Theme.Colors.lava.opacity(art == nil ? 0.22 : 0.12), .clear],
                 center: .bottom,
                 startRadius: 0,
                 endRadius: 520

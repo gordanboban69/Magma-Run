@@ -32,20 +32,18 @@ struct ForgeView: View {
         }
         .scrollIndicators(.hidden)
         .background(VolcanoBackdrop(emberCount: 16))
-        .navigationTitle("Forge")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .stoneNavigation("Forge")
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .accessibilityIdentifier(AccessibilityID.Forge.screen)
     }
 
     private var balanceCard: some View {
         HStack(spacing: 14) {
-            Image(systemName: "hammer.fill")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Theme.emberGradient)
-                .frame(width: 46, height: 46)
-                .background(Circle().fill(Theme.Colors.lava.opacity(0.16)))
+            Image(Art.Menu.forge)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 56, height: 56)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text("Your embers")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -90,15 +88,12 @@ private struct UpgradeRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: kind.systemImage)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Theme.Colors.ember)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Theme.Colors.ember.opacity(0.14))
-                    )
+                Image(Art.upgrade(kind))
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 68, height: 68)
                     .scaleEffect(pulse ? 1.15 : 1)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 5) {
                     HStack {
                         Text(kind.title)
@@ -152,8 +147,7 @@ private struct UpgradeRow: View {
         if let cost {
             Button(action: onForge) {
                 HStack(spacing: 6) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 12, weight: .bold))
+                    EmberGlyph(size: 14, onMolten: true)
                     Text(Formatters.integer(cost))
                 }
             }
@@ -164,9 +158,9 @@ private struct UpgradeRow: View {
             Text("MAXED")
                 .font(.display(13, weight: .black))
                 .foregroundStyle(Theme.Colors.ember)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 14)
-                .background(Capsule().strokeBorder(Theme.Colors.ember.opacity(0.6), lineWidth: 1.5))
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .background(NineSlice(piece: Chrome.stonePressed, scale: 0.6))
                 .accessibilityIdentifier(AccessibilityID.Forge.upgradeButton(kind.id))
         }
     }

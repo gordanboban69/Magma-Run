@@ -20,6 +20,10 @@ struct GameHUDState: Equatable, Sendable {
     var upcomingMood: VolcanoMood?
     var moodRemaining: TimeInterval = 0
     var lavaWarning = false
+    /// Shards held toward the next heart.
+    var heartShards = 0
+    var hasCrust = false
+    var isOnCrust = false
 
     init(loadout: HeroLoadout) {
         hearts = loadout.maxHearts
@@ -44,6 +48,9 @@ struct GameHUDState: Equatable, Sendable {
         upcomingMood = session.upcomingMood
         moodRemaining = session.moodRemaining
         lavaWarning = session.lavaRiver?.phase == .warning
+        heartShards = session.heartShards
+        hasCrust = session.crust != nil
+        isOnCrust = session.isOnCrust
     }
 }
 
@@ -57,4 +64,7 @@ enum GameEvent: Equatable, Sendable {
     case overdriveStarted
     case moodChanged(VolcanoMood)
     case lavaStarted
+    case crustFormed
+    case shardCollected
+    case heartRestored
 }

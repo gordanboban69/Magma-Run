@@ -175,6 +175,10 @@ extension GameViewModel: VolcanoSceneDelegate {
             haptics.notify(.success)
         case .moodChanged, .lavaStarted:
             haptics.impact(.medium)
+        case .crustFormed, .shardCollected:
+            haptics.impact(.light)
+        case .heartRestored:
+            haptics.notify(.success)
         }
     }
 

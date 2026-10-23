@@ -1,100 +1,96 @@
 import SpriteKit
 
-/// The player's character, assembled from vector shapes tinted with the selected skin.
+/// The player's character: a four-frame run cycle from the generated art,
+/// with a shield bubble, an ember trail and overdrive / damage effects.
 @MainActor
 final class HeroNode: SKNode {
     static let bodyRadius: CGFloat = 22
 
-    private let body: SKShapeNode
-    private let head: SKShapeNode
-    private let visor: SKShapeNode
-    private let emblem: SKShapeNode
-    private let shieldRing: SKShapeNode
+    /// Painted frames are 90 × 110 pt with the feet at y = 104 pt from the top.
+    private static let frameSize = CGSize(width: 90, height: 110)
+    private static let feetFromTop: CGFloat = 104
+    private static let spriteScale: CGFloat = 0.78
+    /// Where the feet sit relative to the node origin (the physics body centre is at y = 4).
+    private static let feetY: CGFloat = -26
+
+    private let sprite: SKSpriteNode
+    private let aura: SKSpriteNode
+    private let shadow: SKSpriteNode
+    private let shieldBubble: SKSpriteNode
     private let trail: SKEmitterNode
+    private let runFrames: [SKTexture]
     private let glowColor: UIColor
-    private let primaryColor: UIColor
 
     init(skin: HeroSkin) {
-        let primary = skin.primary.uiColor
-        let secondary = skin.secondary.uiColor
         glowColor = skin.glow.uiColor
-        primaryColor = primary
+        runFrames = TextureFactory.frames(Art.heroRunFrames(skin))
 
-        body = SKShapeNode(path: CGPath(roundedRect: CGRect(x: -16, y: -24, width: 32, height: 40), cornerWidth: 15, cornerHeight: 15, transform: nil))
-        body.fillColor = primary
-        body.strokeColor = secondary
-        body.lineWidth = 2.5
+        sprite = SKSpriteNode(texture: runFrames.first)
+        sprite.size = CGSize(width: Self.frameSize.width * Self.spriteScale, height: Self.frameSize.height * Self.spriteScale)
+        sprite.anchorPoint = CGPoint(x: 0.5, y: 1 - Self.feetFromTop / Self.frameSize.height)
+        sprite.position = CGPoint(x: 0, y: Self.feetY)
 
-        head = SKShapeNode(circleOfRadius: 13)
-        head.position = CGPoint(x: 0, y: 22)
-        head.fillColor = primary
-        head.strokeColor = secondary
-        head.lineWidth = 2.5
+        aura = SKSpriteNode(texture: TextureFactory.softCircle(diameter: 64))
+        aura.size = CGSize(width: 96, height: 96)
+        aura.position = CGPoint(x: 0, y: 6)
+        aura.color = skin.glow.uiColor
+        aura.colorBlendFactor = 1
+        aura.blendMode = .add
+        aura.alpha = 0.22
+        aura.zPosition = -2
 
-        visor = SKShapeNode(path: CGPath(roundedRect: CGRect(x: -9, y: -4, width: 18, height: 8), cornerWidth: 4, cornerHeight: 4, transform: nil))
-        visor.position = CGPoint(x: 0, y: 23)
-        visor.fillColor = glowColor
-        visor.strokeColor = .clear
-        visor.glowWidth = 2
+        shadow = SKSpriteNode(texture: TextureFactory.softCircle(diameter: 64))
+        shadow.size = CGSize(width: 56, height: 12)
+        shadow.position = CGPoint(x: 0, y: Self.feetY + 1)
+        shadow.color = .black
+        shadow.colorBlendFactor = 1
+        shadow.alpha = 0.6
+        shadow.zPosition = -3
 
-        let diamond = CGMutablePath()
-        diamond.move(to: CGPoint(x: 0, y: 6))
-        diamond.addLine(to: CGPoint(x: 5, y: 0))
-        diamond.addLine(to: CGPoint(x: 0, y: -6))
-        diamond.addLine(to: CGPoint(x: -5, y: 0))
-        diamond.closeSubpath()
-        emblem = SKShapeNode(path: diamond)
-        emblem.position = CGPoint(x: 0, y: -4)
-        emblem.fillColor = glowColor
-        emblem.strokeColor = .clear
-        emblem.glowWidth = 1.5
-
-        shieldRing = SKShapeNode(circleOfRadius: 34)
-        shieldRing.strokeColor = glowColor
-        shieldRing.lineWidth = 3
-        shieldRing.glowWidth = 8
-        shieldRing.fillColor = glowColor.withAlphaComponent(0.08)
-        shieldRing.alpha = 0
+        shieldBubble = SKSpriteNode(texture: TextureFactory.named(Art.shieldBubble))
+        shieldBubble.size = CGSize(width: 86, height: 86)
+        shieldBubble.position = CGPoint(x: 0, y: 4)
+        shieldBubble.alpha = 0
+        shieldBubble.zPosition = 2
 
         trail = SKEmitterNode()
         trail.particleTexture = TextureFactory.softCircle(diameter: 32)
-        trail.particleBirthRate = 45
-        trail.particleLifetime = 0.55
+        trail.particleBirthRate = 30
+        trail.particleLifetime = 0.5
         trail.particleLifetimeRange = 0.2
-        trail.particlePositionRange = CGVector(dx: 14, dy: 2)
-        trail.particleSpeed = 70
+        trail.particlePositionRange = CGVector(dx: 16, dy: 2)
+        trail.particleSpeed = 50
         trail.particleSpeedRange = 25
-        trail.emissionAngle = -.pi / 2
-        trail.emissionAngleRange = 0.5
-        trail.particleScale = 0.55
-        trail.particleScaleSpeed = -0.9
-        trail.particleAlpha = 0.9
+        trail.emissionAngle = .pi / 2
+        trail.emissionAngleRange = 0.8
+        trail.particleScale = 0.4
+        trail.particleScaleSpeed = -0.7
+        trail.particleAlpha = 0.8
         trail.particleAlphaSpeed = -1.6
         trail.particleColor = glowColor
         trail.particleColorBlendFactor = 1
         trail.particleBlendMode = .add
-        trail.position = CGPoint(x: 0, y: -24)
+        trail.position = CGPoint(x: 0, y: Self.feetY + 2)
         trail.zPosition = -1
 
         super.init()
 
+        addChild(shadow)
+        addChild(aura)
         addChild(trail)
-        addChild(body)
-        addChild(head)
-        addChild(visor)
-        addChild(emblem)
-        addChild(shieldRing)
+        addChild(sprite)
+        addChild(shieldBubble)
 
         let physics = SKPhysicsBody(circleOfRadius: Self.bodyRadius, center: CGPoint(x: 0, y: 4))
         physics.isDynamic = true
         physics.affectedByGravity = false
         physics.allowsRotation = false
         physics.categoryBitMask = PhysicsCategory.hero
-        physics.contactTestBitMask = PhysicsCategory.boulder | PhysicsCategory.ember
+        physics.contactTestBitMask = PhysicsCategory.boulder | PhysicsCategory.ember | PhysicsCategory.shard
         physics.collisionBitMask = PhysicsCategory.none
         physicsBody = physics
 
-        runIdleBob()
+        startRunCycle()
     }
 
     @available(*, unavailable)
@@ -104,30 +100,45 @@ final class HeroNode: SKNode {
 
     // MARK: - Animation
 
-    private func runIdleBob() {
-        let up = SKAction.moveBy(x: 0, y: 3, duration: 0.9)
-        up.timingMode = .easeInEaseOut
-        let down = up.reversed()
-        head.run(.repeatForever(.sequence([up, down])), withKey: "idle")
+    private func startRunCycle() {
+        let cycle = SKAction.animate(with: runFrames, timePerFrame: 0.1, resize: false, restore: false)
+        sprite.run(.repeatForever(cycle), withKey: "run")
+        // Idle pace until the hero actually moves.
+        sprite.speed = 0.45
+        let pulse = SKAction.sequence([.fadeAlpha(to: 0.32, duration: 0.8), .fadeAlpha(to: 0.18, duration: 0.8)])
+        aura.run(.repeatForever(pulse), withKey: "aura")
     }
 
-    /// Leans the body in the direction of travel. `amount` is in `-1...1`.
+    /// Leans and faces the hero in the direction of travel. `amount` is in `-1...1`.
     func setLean(_ amount: CGFloat) {
         let clamped = min(max(amount, -1), 1)
-        zRotation = -clamped * 0.22
-        trail.particleBirthRate = 45 + abs(clamped) * 60
+        sprite.zRotation = -clamped * 0.16
+        if abs(clamped) > 0.15 {
+            sprite.xScale = clamped < 0 ? -1 : 1
+        }
+        sprite.speed = 0.45 + abs(clamped) * 1.1
+        trail.particleBirthRate = (isOverdriveVisible ? 140 : 30) + abs(clamped) * 50
     }
 
+    private var isShieldShown: Bool?
+
+    /// Shows or hides the shield bubble. Cheap to call every frame: only changes animate.
     func setShieldVisible(_ visible: Bool, animated: Bool = true) {
-        let target: CGFloat = visible ? 1 : 0
+        guard visible != isShieldShown else { return }
+        isShieldShown = visible
+        let target: CGFloat = visible ? 0.95 : 0
         if animated {
-            shieldRing.run(.fadeAlpha(to: target, duration: 0.3), withKey: "shieldFade")
+            shieldBubble.run(.fadeAlpha(to: target, duration: 0.3), withKey: "shieldFade")
             if visible {
-                shieldRing.setScale(0.6)
-                shieldRing.run(.scale(to: 1, duration: 0.35))
+                shieldBubble.setScale(0.6)
+                let grow = SKAction.scale(to: 1, duration: 0.35)
+                grow.timingMode = .easeOut
+                shieldBubble.run(grow)
+                let spin = SKAction.rotate(byAngle: .pi * 2, duration: 8)
+                shieldBubble.run(.repeatForever(spin), withKey: "spin")
             }
         } else {
-            shieldRing.alpha = target
+            shieldBubble.alpha = target
         }
     }
 
@@ -138,80 +149,89 @@ final class HeroNode: SKNode {
         guard active != isOverdriveVisible else { return }
         isOverdriveVisible = active
         if active {
-            let hot = UIColor(red: 1.0, green: 0.55, blue: 0.15, alpha: 1)
-            body.fillColor = hot
-            head.fillColor = hot
-            body.glowWidth = 6
-            head.glowWidth = 6
-            trail.particleBirthRate = 160
+            sprite.color = UIColor(red: 1.0, green: 0.55, blue: 0.15, alpha: 1)
+            sprite.run(.colorize(withColorBlendFactor: 0.55, duration: 0.15), withKey: "tint")
+            aura.color = UIColor(red: 1.0, green: 0.6, blue: 0.15, alpha: 1)
+            aura.removeAction(forKey: "aura")
+            aura.size = CGSize(width: 130, height: 130)
+            aura.alpha = 0.6
             trail.particleColor = UIColor(red: 1.0, green: 0.85, blue: 0.4, alpha: 1)
-            let pulse = SKAction.sequence([.scale(to: 1.12, duration: 0.18), .scale(to: 1.0, duration: 0.18)])
+            let pulse = SKAction.sequence([.scale(to: 1.1, duration: 0.18), .scale(to: 1.0, duration: 0.18)])
             run(.repeatForever(pulse), withKey: "overdrivePulse")
         } else {
-            body.fillColor = primaryColor
-            head.fillColor = primaryColor
-            body.glowWidth = 0
-            head.glowWidth = 0
+            sprite.run(.colorize(withColorBlendFactor: 0, duration: 0.2), withKey: "tint")
+            aura.color = glowColor
+            aura.size = CGSize(width: 96, height: 96)
+            aura.alpha = 0.22
+            let pulse = SKAction.sequence([.fadeAlpha(to: 0.32, duration: 0.8), .fadeAlpha(to: 0.18, duration: 0.8)])
+            aura.run(.repeatForever(pulse), withKey: "aura")
             trail.particleColor = glowColor
             removeAction(forKey: "overdrivePulse")
             run(.scale(to: 1.0, duration: 0.15))
         }
     }
 
-    /// Expanding ring used when rage discharges as a shockwave.
+    /// Expanding fire ring used when rage discharges as a shockwave.
     func playShockwave(radius: CGFloat) {
-        let ring = SKShapeNode(circleOfRadius: 30)
-        ring.strokeColor = UIColor(red: 1.0, green: 0.7, blue: 0.25, alpha: 1)
-        ring.lineWidth = 6
-        ring.glowWidth = 14
+        let ring = SKSpriteNode(texture: TextureFactory.named(Art.shockwaveRing))
+        ring.size = CGSize(width: 60, height: 60)
+        ring.blendMode = .add
         ring.zPosition = 3
         addChild(ring)
-        let scale = SKAction.scale(to: radius / 30, duration: 0.45)
+        let scale = SKAction.scale(to: radius / 30, duration: 0.5)
         scale.timingMode = .easeOut
-        ring.run(.sequence([.group([scale, .fadeOut(withDuration: 0.45)]), .removeFromParent()]))
+        ring.run(.sequence([.group([scale, .sequence([.wait(forDuration: 0.2), .fadeOut(withDuration: 0.3)])]), .removeFromParent()]))
     }
 
-    /// Flashes the ring outward when the shield absorbs a hit.
+    /// Bursts the bubble when the shield absorbs a hit.
     func playShieldBreak() {
-        let burst = SKShapeNode(circleOfRadius: 34)
-        burst.strokeColor = glowColor
-        burst.lineWidth = 4
-        burst.glowWidth = 10
-        burst.zPosition = 1
+        let burst = SKSpriteNode(texture: TextureFactory.named(Art.shieldBubble))
+        burst.size = shieldBubble.size
+        burst.position = shieldBubble.position
+        burst.zPosition = 2
         addChild(burst)
         burst.run(.sequence([
-            .group([.scale(to: 2.2, duration: 0.35), .fadeOut(withDuration: 0.35)]),
+            .group([.scale(to: 2.0, duration: 0.35), .fadeOut(withDuration: 0.35)]),
             .removeFromParent()
         ]))
+        shieldBubble.removeAction(forKey: "spin")
         setShieldVisible(false)
+    }
+
+    /// A short golden pulse when heart shards restore a heart.
+    func playHeal() {
+        let flash = SKSpriteNode(texture: TextureFactory.softCircle(diameter: 64))
+        flash.size = CGSize(width: 70, height: 70)
+        flash.position = CGPoint(x: 0, y: 4)
+        flash.color = UIColor(red: 1.0, green: 0.35, blue: 0.4, alpha: 1)
+        flash.colorBlendFactor = 1
+        flash.blendMode = .add
+        flash.zPosition = 4
+        addChild(flash)
+        flash.run(.sequence([
+            .group([.scale(to: 2.4, duration: 0.45), .fadeOut(withDuration: 0.45)]),
+            .removeFromParent()
+        ]))
     }
 
     /// Blinks while the hero is invulnerable after taking damage.
     func playDamageBlink(duration: TimeInterval) {
         guard !isOverdriveVisible else { return }
         removeAction(forKey: "blink")
-        let blink = SKAction.sequence([.fadeAlpha(to: 0.25, duration: 0.08), .fadeAlpha(to: 1, duration: 0.08)])
+        let blink = SKAction.sequence([.fadeAlpha(to: 0.3, duration: 0.08), .fadeAlpha(to: 1, duration: 0.08)])
         let count = max(1, Int(duration / 0.16))
         run(.sequence([.repeat(blink, count: count), .fadeAlpha(to: 1, duration: 0.05)]), withKey: "blink")
 
-        let flash = SKAction.sequence([
-            .run { [body, head] in
-                body.fillColor = .white
-                head.fillColor = .white
-            },
-            .wait(forDuration: 0.08),
-            .run { [body, head, primaryColor] in
-                body.fillColor = primaryColor
-                head.fillColor = primaryColor
-            }
-        ])
-        run(flash)
+        sprite.color = .white
+        sprite.colorBlendFactor = 0.9
+        sprite.run(.colorize(withColorBlendFactor: 0, duration: 0.18), withKey: "tint")
     }
 
     /// Plays the defeat animation and calls `completion` when done.
     func playDefeat(completion: @escaping @MainActor () -> Void) {
         physicsBody = nil
         trail.particleBirthRate = 0
+        sprite.removeAction(forKey: "run")
 
         let burst = SKEmitterNode()
         burst.particleTexture = TextureFactory.softCircle(diameter: 32)
@@ -230,12 +250,18 @@ final class HeroNode: SKNode {
         burst.zPosition = 2
         addChild(burst)
 
+        sprite.color = UIColor(red: 0.15, green: 0.1, blue: 0.12, alpha: 1)
         let collapse = SKAction.group([
+            .colorize(withColorBlendFactor: 0.8, duration: 0.25),
             .scale(to: 0.1, duration: 0.5),
             .rotate(byAngle: .pi * 1.5, duration: 0.5),
             .fadeOut(withDuration: 0.5)
         ])
         collapse.timingMode = .easeIn
-        run(.sequence([collapse, .wait(forDuration: 0.3), .run { completion() }]))
+        sprite.run(collapse)
+        shieldBubble.run(.fadeOut(withDuration: 0.2))
+        aura.run(.fadeOut(withDuration: 0.3))
+        shadow.run(.fadeOut(withDuration: 0.3))
+        run(.sequence([.wait(forDuration: 0.8), .run { completion() }]))
     }
 }

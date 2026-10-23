@@ -1,6 +1,6 @@
 import SpriteKit
 
-/// A rock launched by the volcano. Hot boulders glow but behave identically.
+/// A rock launched by the volcano. Hot boulders glow and drop heart shards when smashed.
 @MainActor
 final class BoulderNode: SKSpriteNode {
     let radius: CGFloat
@@ -11,8 +11,10 @@ final class BoulderNode: SKSpriteNode {
     init(radius: CGFloat, variant: Int, isHot: Bool) {
         self.radius = radius
         self.isHot = isHot
-        let texture = TextureFactory.boulder(variant: variant, hot: isHot)
-        super.init(texture: texture, color: .clear, size: CGSize(width: radius * 2.15, height: radius * 2.15))
+        let texture = TextureFactory.named(Art.boulder(variant: variant, hot: isHot))
+        // The painted rock fills about 80% of its 120 pt canvas.
+        let side = radius * 2.5
+        super.init(texture: texture, color: .clear, size: CGSize(width: side, height: side))
 
         zPosition = SceneLayer.boulders
 
@@ -22,14 +24,14 @@ final class BoulderNode: SKSpriteNode {
             glow.color = UIColor(red: 1.0, green: 0.45, blue: 0.1, alpha: 1)
             glow.colorBlendFactor = 1
             glow.blendMode = .add
-            glow.alpha = 0.55
+            glow.alpha = 0.5
             glow.zPosition = -1
             addChild(glow)
-            let pulse = SKAction.sequence([.fadeAlpha(to: 0.3, duration: 0.35), .fadeAlpha(to: 0.6, duration: 0.35)])
+            let pulse = SKAction.sequence([.fadeAlpha(to: 0.25, duration: 0.35), .fadeAlpha(to: 0.55, duration: 0.35)])
             glow.run(.repeatForever(pulse))
         }
 
-        let body = SKPhysicsBody(circleOfRadius: radius * 0.92)
+        let body = SKPhysicsBody(circleOfRadius: radius * 0.82)
         body.categoryBitMask = PhysicsCategory.boulder
         body.contactTestBitMask = PhysicsCategory.hero
         body.collisionBitMask = PhysicsCategory.none
@@ -45,34 +47,60 @@ final class BoulderNode: SKSpriteNode {
         fatalError("BoulderNode does not support NSCoding")
     }
 
-    /// Breaks the boulder into fragments and removes it from the scene.
+    /// Breaks the boulder into tumbling chips plus dust and removes it from the scene.
     func shatter() {
         physicsBody = nil
         guard let parent else { return }
 
-        let fragments = SKEmitterNode()
-        fragments.particleTexture = TextureFactory.softCircle(diameter: 32)
-        fragments.numParticlesToEmit = 18
-        fragments.particleBirthRate = 300
-        fragments.particleLifetime = 0.6
-        fragments.particleSpeed = 160
-        fragments.particleSpeedRange = 90
-        fragments.emissionAngleRange = .pi * 2
-        fragments.particleScale = 0.45
-        fragments.particleScaleSpeed = -0.6
-        fragments.particleAlphaSpeed = -1.5
-        fragments.particleColor = isHot
+        let chips = TextureFactory.frames(Art.rockChips)
+        let chipCount = Int(radius / 6) + 3
+        for index in 0..<chipCount {
+            let chip = SKSpriteNode(texture: chips[index % chips.count])
+            let side = CGFloat.random(in: 8...14) * (radius / 22)
+            chip.size = CGSize(width: side, height: side)
+            chip.position = position
+            chip.zRotation = CGFloat.random(in: 0...(.pi * 2))
+            chip.zPosition = SceneLayer.effects
+            if isHot {
+                chip.color = UIColor(red: 1.0, green: 0.5, blue: 0.15, alpha: 1)
+                chip.colorBlendFactor = 0.35
+            }
+            parent.addChild(chip)
+
+            let angle = CGFloat(index) / CGFloat(chipCount) * .pi * 2 + CGFloat.random(in: -0.3...0.3)
+            let distance = CGFloat.random(in: 40...90) * (radius / 22)
+            let flight = SKAction.move(by: CGVector(dx: cos(angle) * distance, dy: sin(angle) * distance - 30), duration: 0.5)
+            flight.timingMode = .easeOut
+            chip.run(.sequence([
+                .group([flight, .rotate(byAngle: CGFloat.random(in: -6...6), duration: 0.5), .sequence([.wait(forDuration: 0.25), .fadeOut(withDuration: 0.25)])]),
+                .removeFromParent()
+            ]))
+        }
+
+        let dust = SKEmitterNode()
+        dust.particleTexture = TextureFactory.softCircle(diameter: 32)
+        dust.numParticlesToEmit = 12
+        dust.particleBirthRate = 300
+        dust.particleLifetime = 0.6
+        dust.particleSpeed = 90
+        dust.particleSpeedRange = 50
+        dust.emissionAngleRange = .pi * 2
+        dust.particleScale = 0.7
+        dust.particleScaleSpeed = 0.4
+        dust.particleAlpha = 0.5
+        dust.particleAlphaSpeed = -0.9
+        dust.particleColor = isHot
             ? UIColor(red: 1.0, green: 0.5, blue: 0.15, alpha: 1)
-            : UIColor(red: 0.6, green: 0.52, blue: 0.5, alpha: 1)
-        fragments.particleColorBlendFactor = 1
-        fragments.particleBlendMode = isHot ? .add : .alpha
-        fragments.position = position
-        fragments.zPosition = SceneLayer.effects
-        parent.addChild(fragments)
-        fragments.run(.sequence([.wait(forDuration: 0.8), .removeFromParent()]))
+            : UIColor(red: 0.45, green: 0.38, blue: 0.38, alpha: 1)
+        dust.particleColorBlendFactor = 1
+        dust.particleBlendMode = isHot ? .add : .alpha
+        dust.position = position
+        dust.zPosition = SceneLayer.effects - 1
+        parent.addChild(dust)
+        dust.run(.sequence([.wait(forDuration: 0.8), .removeFromParent()]))
 
         run(.sequence([
-            .group([.scale(to: 0.2, duration: 0.12), .fadeOut(withDuration: 0.12)]),
+            .group([.scale(to: 0.3, duration: 0.1), .fadeOut(withDuration: 0.1)]),
             .removeFromParent()
         ]))
     }

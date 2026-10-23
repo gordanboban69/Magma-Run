@@ -4,11 +4,11 @@ import Foundation
 /// All functions are pure so the balance can be unit tested.
 enum GameBalance {
     /// Seconds between boulder launches at the very start of a run.
-    static let initialSpawnInterval: TimeInterval = 1.15
+    static let initialSpawnInterval: TimeInterval = 1.4
     /// Seconds between boulder launches once the eruption reaches full intensity.
     static let minimumSpawnInterval: TimeInterval = 0.34
     /// Time needed for the eruption to reach full intensity.
-    static let rampDuration: TimeInterval = 120
+    static let rampDuration: TimeInterval = 150
     /// Base interval between ember (currency) drops.
     static let emberSpawnInterval: TimeInterval = 2.2
 

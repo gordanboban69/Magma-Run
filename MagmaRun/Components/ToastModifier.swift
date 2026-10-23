@@ -17,13 +17,11 @@ struct ToastModifier: ViewModifier {
                             .foregroundStyle(Theme.Colors.textPrimary)
                             .multilineTextAlignment(.leading)
                     }
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 20)
                     .background {
-                        Capsule()
-                            .fill(Theme.Colors.surfaceElevated)
-                            .overlay(Capsule().strokeBorder(Theme.Colors.stroke, lineWidth: 1))
-                            .shadow(color: .black.opacity(0.4), radius: 14, y: 6)
+                        NineSlice(piece: Chrome.toast, scale: 0.7)
+                            .shadow(color: .black.opacity(0.5), radius: 12, y: 6)
                     }
                     .padding(.bottom, 12)
                     .padding(.horizontal, 20)

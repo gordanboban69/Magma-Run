@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct MagmaRunApp: App {
@@ -6,6 +7,26 @@ struct MagmaRunApp: App {
 
     init() {
         bootstrap = Result { try AppDependencies() }
+        Self.styleNavigationTitles()
+    }
+
+    /// Navigation titles use the game's chiselled display face in ember gold.
+    private static func styleNavigationTitles() {
+        let ember = UIColor(red: 1.0, green: 0.70, blue: 0.22, alpha: 1)
+        let appearance = UINavigationBar.appearance()
+        if let large = UIFont(name: "Futura-CondensedExtraBold", size: 36) {
+            appearance.largeTitleTextAttributes = [
+                .font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large),
+                .foregroundColor: ember
+            ]
+        }
+        if let inline = UIFont(name: "Futura-CondensedExtraBold", size: 20) {
+            appearance.titleTextAttributes = [
+                .font: UIFontMetrics(forTextStyle: .headline).scaledFont(for: inline),
+                .foregroundColor: ember
+            ]
+        }
+        appearance.tintColor = ember
     }
 
     var body: some Scene {

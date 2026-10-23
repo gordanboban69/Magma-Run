@@ -18,12 +18,27 @@ struct SettingsView: View {
                         Label("Controls", systemImage: settings.controlScheme.systemImage)
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundStyle(Theme.Colors.textPrimary)
-                        Picker("Controls", selection: $settings.controlScheme) {
+                        // Two carved slabs; the chosen scheme glows molten.
+                        HStack(spacing: 10) {
                             ForEach(ControlScheme.allCases) { scheme in
-                                Text(scheme.title).tag(scheme)
+                                let isSelected = settings.controlScheme == scheme
+                                Button {
+                                    settings.controlScheme = scheme
+                                } label: {
+                                    Label(scheme.shortTitle, systemImage: scheme.systemImage)
+                                        .font(.display(16))
+                                        .lineLimit(1)
+                                        .textCase(.uppercase)
+                                        .foregroundStyle(isSelected ? Chrome.moltenInk : Theme.Colors.textSecondary)
+                                        .frame(maxWidth: .infinity, minHeight: 48)
+                                        .background(NineSlice(piece: isSelected ? Chrome.molten : Chrome.stonePressed, scale: 0.72))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(isSelected ? .isSelected : [])
                             }
                         }
-                        .pickerStyle(.segmented)
+                        .animation(.spring(duration: 0.25), value: settings.controlScheme)
+                        .accessibilityElement(children: .contain)
                         .accessibilityIdentifier(AccessibilityID.Settings.controlPicker)
                         Text(settings.controlScheme == .drag
                              ? "The runner follows your finger anywhere on the screen."
@@ -32,14 +47,14 @@ struct SettingsView: View {
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
 
-                    Divider().overlay(Theme.Colors.stroke)
+                    FlameDivider()
 
                     Toggle(isOn: $settings.hapticsEnabled) {
                         Label("Haptic feedback", systemImage: "iphone.radiowaves.left.and.right")
                             .font(.system(size: 15, weight: .semibold, design: .rounded))
                             .foregroundStyle(Theme.Colors.textPrimary)
                     }
-                    .tint(Theme.Colors.lava)
+                    .toggleStyle(StoneToggleStyle())
                     .onChange(of: settings.hapticsEnabled) { _, _ in viewModel.hapticsChanged() }
                     .accessibilityIdentifier(AccessibilityID.Settings.hapticsToggle)
                 }
@@ -56,20 +71,20 @@ struct SettingsView: View {
                         }
                         Spacer()
                         Button("Reset", role: .destructive, action: viewModel.requestReset)
-                            .font(.display(14, weight: .bold))
+                            .font(.display(15))
+                            .textCase(.uppercase)
                             .foregroundStyle(Theme.Colors.danger)
-                            .padding(.vertical, 9)
-                            .padding(.horizontal, 14)
-                            .background(Capsule().fill(Theme.Colors.danger.opacity(0.14)))
+                            .frame(minWidth: 92, minHeight: 44)
+                            .background(NineSlice(piece: Chrome.stone, scale: 0.62))
                             .accessibilityIdentifier(AccessibilityID.Settings.resetButton)
                     }
                 }
 
                 settingsGroup(title: "About") {
                     aboutRow(title: "Version", value: viewModel.appVersion)
-                    Divider().overlay(Theme.Colors.stroke)
-                    aboutRow(title: "Made with", value: "SwiftUI + SpriteKit")
-                    Divider().overlay(Theme.Colors.stroke)
+                    FlameDivider()
+                    aboutRow(title: "Save data", value: "On this device")
+                    FlameDivider()
                     Text("Magma Run stores your progress only on this device. No account, no tracking, no network.")
                         .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundStyle(Theme.Colors.textSecondary)
@@ -83,9 +98,7 @@ struct SettingsView: View {
         }
         .scrollIndicators(.hidden)
         .background(VolcanoBackdrop(emberCount: 12))
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .stoneNavigation("Settings")
         .toast(message: $viewModel.toastMessage, isError: viewModel.toastIsError)
         .confirmationDialog(
             "Reset all progress?",
@@ -104,8 +117,8 @@ struct SettingsView: View {
     private func settingsGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.Colors.textTertiary)
+                .font(.display(18))
+                .foregroundStyle(Theme.Colors.ember)
                 .textCase(.uppercase)
             content()
         }

@@ -1,84 +1,84 @@
 import SwiftUI
 
-/// The primary call-to-action style: a molten gradient pill that squashes when pressed.
+/// The primary call to action: a molten slab set in basalt that sinks when pressed.
 struct LavaButtonStyle: ButtonStyle {
     var isProminent = true
+    @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.display(18, weight: .bold))
-            .foregroundStyle(.white)
-            .padding(.vertical, 16)
-            .padding(.horizontal, 24)
-            .frame(maxWidth: .infinity)
+            .font(.display(19))
+            .textCase(.uppercase)
+            .tracking(1.2)
+            .foregroundStyle(isEnabled ? Chrome.moltenInk : Theme.Colors.textSecondary)
+            .shadow(color: .white.opacity(isEnabled ? 0.35 : 0), radius: 0, y: 1)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 28)
+            .frame(maxWidth: .infinity, minHeight: 60)
+            // The pressed art sits ~4 pt lower, so the label follows it down.
+            .offset(y: configuration.isPressed ? 2 : -1)
             .background {
-                Capsule()
-                    .fill(Theme.lavaGradient)
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(.white.opacity(0.25), lineWidth: 1)
-                    }
-                    .shadow(color: Theme.Colors.lava.opacity(isProminent ? 0.55 : 0.25), radius: configuration.isPressed ? 6 : 18, y: 8)
+                NineSlice(piece: !isEnabled ? Chrome.disabled : (configuration.isPressed ? Chrome.moltenPressed : Chrome.molten), scale: 0.9)
+                    .shadow(color: Theme.Colors.lava.opacity(isProminent && isEnabled ? 0.45 : 0), radius: configuration.isPressed ? 6 : 16, y: 4)
             }
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .opacity(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(duration: 0.25, bounce: 0.35), value: configuration.isPressed)
+            .animation(.spring(duration: 0.18, bounce: 0.3), value: configuration.isPressed)
     }
 }
 
-/// A quiet secondary style: translucent surface with a thin stroke.
+/// The secondary action: a chiselled basalt slab with light text.
 struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.display(16, weight: .semibold))
+            .font(.display(16))
+            .textCase(.uppercase)
+            .tracking(0.8)
             .foregroundStyle(Theme.Colors.textPrimary)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
+            .padding(.vertical, 15)
+            .padding(.horizontal, 22)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .offset(y: configuration.isPressed ? 2 : -1)
             .background {
-                Capsule()
-                    .fill(.white.opacity(configuration.isPressed ? 0.16 : 0.08))
-                    .overlay {
-                        Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1)
-                    }
+                NineSlice(piece: configuration.isPressed ? Chrome.stonePressed : Chrome.stone, scale: 0.8)
             }
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(duration: 0.25, bounce: 0.3), value: configuration.isPressed)
+            .animation(.spring(duration: 0.18, bounce: 0.3), value: configuration.isPressed)
     }
 }
 
-/// Compact style for inline actions such as "Forge" or "Select".
+/// Compact molten slab for inline actions such as forging or unlocking.
 struct CompactLavaButtonStyle: ButtonStyle {
     var isEnabledLook = true
 
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.display(14, weight: .bold))
-            .foregroundStyle(.white)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 16)
-            .background {
-                Capsule()
-                    .fill(isEnabledLook ? AnyShapeStyle(Theme.lavaGradient) : AnyShapeStyle(Color.white.opacity(0.12)))
-            }
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .animation(.spring(duration: 0.2, bounce: 0.4), value: configuration.isPressed)
+        let piece = !isEnabledLook ? Chrome.disabled : (configuration.isPressed ? Chrome.moltenPressed : Chrome.molten)
+        return configuration.label
+            .font(.display(15))
+            .textCase(.uppercase)
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(isEnabledLook ? Chrome.moltenInk : Theme.Colors.background)
+            .padding(.vertical, 11)
+            .padding(.horizontal, 18)
+            .frame(minWidth: 88, minHeight: 44)
+            .offset(y: configuration.isPressed ? 1.5 : -0.5)
+            .background { NineSlice(piece: piece, scale: 0.68) }
+            .animation(.spring(duration: 0.18, bounce: 0.3), value: configuration.isPressed)
     }
 }
 
-/// Circular icon button used in the game HUD and navigation bars.
+/// A round carved stone medallion for icon buttons (pause, settings).
 struct IconButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 17, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 44, height: 44)
+            .font(.system(size: 17, weight: .black))
+            .foregroundStyle(Theme.Colors.ember)
+            .shadow(color: Theme.Colors.lava.opacity(0.6), radius: 4)
+            .offset(y: configuration.isPressed ? 1 : 0)
+            .frame(width: 48, height: 48)
             .background {
-                Circle()
-                    .fill(.black.opacity(0.35))
-                    .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+                Image(configuration.isPressed ? Chrome.roundButtonPressed : Chrome.roundButton)
+                    .resizable()
+                    .scaledToFit()
             }
-            .scaleEffect(configuration.isPressed ? 0.9 : 1)
-            .animation(.spring(duration: 0.2, bounce: 0.4), value: configuration.isPressed)
+            .animation(.spring(duration: 0.15), value: configuration.isPressed)
     }
 }

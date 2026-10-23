@@ -1,39 +1,22 @@
 import SwiftUI
 
-/// Dark obsidian card surface with a soft inner highlight.
+/// A carved basalt tablet behind content; highlighted tablets glow with molten seams.
 struct CardBackground: ViewModifier {
+    /// Kept for call-site compatibility: smaller radii render the tablet's border thinner.
     var cornerRadius: CGFloat = Theme.Metrics.cornerRadius
     var isHighlighted = false
 
     func body(content: Content) -> some View {
         content
             .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Theme.Colors.surface)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.06), .clear],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .strokeBorder(
-                                isHighlighted ? Theme.Colors.lava.opacity(0.7) : Theme.Colors.stroke,
-                                lineWidth: isHighlighted ? 1.5 : 1
-                            )
-                    }
-                    .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
+                NineSlice(piece: isHighlighted ? Chrome.panelLava : Chrome.panel, scale: cornerRadius >= Theme.Metrics.cornerRadius ? 0.62 : 0.5)
+                    .shadow(color: .black.opacity(0.45), radius: 10, y: 6)
             }
     }
 }
 
 extension View {
-    /// Applies the standard card surface.
+    /// Applies the standard carved tablet surface.
     func cardBackground(cornerRadius: CGFloat = Theme.Metrics.cornerRadius, isHighlighted: Bool = false) -> some View {
         modifier(CardBackground(cornerRadius: cornerRadius, isHighlighted: isHighlighted))
     }

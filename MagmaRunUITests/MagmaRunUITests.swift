@@ -143,6 +143,11 @@ final class MagmaRunUITests: XCTestCase {
         element("home.heroes").tap()
         waitFor("heroes.screen")
 
+        // Pick the hero in the roster so the showcase shows its unlock slab.
+        let thumb = element("heroes.thumb.emberScout")
+        XCTAssertTrue(thumb.waitForExistence(timeout: 3))
+        thumb.tap()
+
         let unlock = element("heroes.action.emberScout")
         XCTAssertTrue(unlock.waitForExistence(timeout: 3))
         unlock.tap()

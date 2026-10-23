@@ -11,19 +11,21 @@ struct GameHUDView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
+            // Side columns share the width equally so the score stays centred over the crater.
+            HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 8) {
                     hearts
                     if hud.hasShield {
-                        gauge(progress: hud.shieldCharge, systemImage: "shield.fill", tint: shieldTint,
+                        gauge(progress: hud.shieldCharge, art: Art.HUD.shield, tint: shieldTint,
                               text: hud.shieldCharge >= 1 ? "Shield ready" : "Recharging")
                     }
-                    gauge(progress: hud.rage, systemImage: "dot.radiowaves.left.and.right", tint: rageTint,
+                    gauge(progress: hud.rage, art: Art.HUD.rage, tint: rageTint,
                           text: hud.rage >= 1 ? "Shockwave!" : "Rage \(Int(hud.rage * 100))%")
+                    shardPips
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
                 scoreBlock
-                Spacer()
+                    .fixedSize()
                 VStack(alignment: .trailing, spacing: 8) {
                     Button(action: onPause) {
                         Image(systemName: "pause.fill")
@@ -34,6 +36,7 @@ struct GameHUDView: View {
                     EmberBadge(amount: hud.embers, isCompact: true)
                     comboPips
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -49,58 +52,96 @@ struct GameHUDView: View {
     // MARK: - Pieces
 
     private var hearts: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<hud.maxHearts, id: \.self) { index in
-                Image(systemName: index < hud.hearts ? "heart.fill" : "heart")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(index < hud.hearts ? Theme.Colors.danger : .white.opacity(0.35))
-                    .shadow(color: index < hud.hearts ? Theme.Colors.danger.opacity(0.7) : .clear, radius: 6)
-                    .scaleEffect(index < hud.hearts ? 1 : 0.85)
-                    .animation(.spring(duration: 0.35, bounce: 0.5), value: hud.hearts)
+        // Rows of three keep the chip narrow even with every Vitality level forged.
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(stride(from: 0, to: hud.maxHearts, by: 3)), id: \.self) { rowStart in
+                HStack(spacing: 4) {
+                    ForEach(rowStart..<min(rowStart + 3, hud.maxHearts), id: \.self) { index in
+                        Image(index < hud.hearts ? Art.HUD.heartFull : Art.HUD.heartEmpty)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .opacity(index < hud.hearts ? 1 : 0.6)
+                            .scaleEffect(index < hud.hearts ? 1 : 0.85)
+                            .animation(.spring(duration: 0.35, bounce: 0.5), value: hud.hearts)
+                    }
+                }
             }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)
-        .background(Capsule().fill(.black.opacity(0.35)))
+        .background(NineSlice(piece: Chrome.chip, scale: 0.55))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(hud.hearts) of \(hud.maxHearts) hearts")
     }
 
-    private func gauge(progress: Double, systemImage: String, tint: Color, text: String) -> some View {
+    private func gauge(progress: Double, art: String, tint: Color, text: String) -> some View {
         let isFull = progress >= 1
         return HStack(spacing: 6) {
             ZStack {
                 ProgressRing(progress: progress, lineWidth: 3, tint: tint)
-                    .frame(width: 22, height: 22)
-                Image(systemName: systemImage)
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(isFull ? tint : .white.opacity(0.4))
+                    .frame(width: 24, height: 24)
+                Image(art)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
+                    .saturation(isFull ? 1 : 0.2)
+                    .opacity(isFull ? 1 : 0.7)
             }
             Text(text)
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(isFull ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 10)
-        .background(Capsule().fill(.black.opacity(0.35)))
+        .background(NineSlice(piece: Chrome.chip, scale: 0.55))
         .shadow(color: isFull ? tint.opacity(0.6) : .clear, radius: 8)
         .animation(.easeOut(duration: 0.3), value: isFull)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Heart shards held toward the next restored heart.
+    private var shardPips: some View {
+        HStack(spacing: 2) {
+            ForEach(0..<RunSession.shardsPerHeart, id: \.self) { index in
+                Image(Art.HUD.shard)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .saturation(index < hud.heartShards ? 1 : 0)
+                    .brightness(index < hud.heartShards ? 0 : 0.25)
+                    .opacity(index < hud.heartShards ? 1 : 0.6)
+            }
+            Text("Shards")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .fixedSize()
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .padding(.leading, 3)
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .background(NineSlice(piece: Chrome.chip, scale: 0.55))
+        .animation(.spring(duration: 0.3), value: hud.heartShards)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Heart shards \(hud.heartShards) of \(RunSession.shardsPerHeart)")
     }
 
     /// Ember streak toward the next overdrive.
     private var comboPips: some View {
         HStack(spacing: 3) {
             ForEach(0..<RunSession.overdriveComboLength, id: \.self) { index in
-                Circle()
-                    .fill(index < hud.combo || hud.isOverdrive ? AnyShapeStyle(Theme.emberGradient) : AnyShapeStyle(Color.white.opacity(0.18)))
-                    .frame(width: 7, height: 7)
+                Image(index < hud.combo || hud.isOverdrive ? Chrome.socketFull : Chrome.socketEmpty)
+                    .resizable()
+                    .frame(width: 12, height: 12)
             }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 9)
-        .background(Capsule().fill(.black.opacity(0.35)))
+        .background(NineSlice(piece: Chrome.chip, scale: 0.55))
         .animation(.spring(duration: 0.3), value: hud.combo)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Ember streak \(hud.combo) of \(RunSession.overdriveComboLength)")
@@ -109,26 +150,22 @@ struct GameHUDView: View {
     private var scoreBlock: some View {
         VStack(spacing: 0) {
             Text(Formatters.integer(hud.score))
-                .font(.display(36, weight: .black))
+                .font(.display(38, weight: .black))
                 .monospacedDigit()
+                .lineLimit(1)
                 .foregroundStyle(Theme.Colors.textPrimary)
                 .shadow(color: .black.opacity(0.6), radius: 6, y: 2)
-                .contentTransition(.numericText(value: Double(hud.score)))
-                .animation(.linear(duration: 0.1), value: hud.score)
                 .accessibilityIdentifier(AccessibilityID.Game.scoreLabel)
             Text(Formatters.duration(hud.elapsed))
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                .lineLimit(1)
                 .foregroundStyle(Theme.Colors.textSecondary)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.black.opacity(0.62))
-        )
-        // Keep the rolling digits inside the pill.
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 6)
+        .background(NineSlice(piece: Chrome.toast, scale: 0.6))
         .accessibilityElement(children: .combine)
     }
 
@@ -136,24 +173,41 @@ struct GameHUDView: View {
     @ViewBuilder
     private var banner: some View {
         if hud.isOverdrive {
-            bannerLabel("OVERDRIVE \(Int(hud.overdriveRemaining.rounded(.up)))s", systemImage: "bolt.fill", tint: Theme.Colors.ember)
+            bannerLabel("OVERDRIVE \(Int(hud.overdriveRemaining.rounded(.up)))s", art: Art.HUD.overdrive, tint: Theme.Colors.ember)
         } else if let upcoming = hud.upcomingMood {
-            bannerLabel(upcoming.warningText, systemImage: upcoming.systemImage, tint: Theme.Colors.danger)
+            bannerLabel(upcoming.warningText, art: Art.mood(upcoming), tint: Theme.Colors.danger)
         } else if hud.lavaWarning {
-            bannerLabel("Lava rising! Move!", systemImage: "exclamationmark.triangle.fill", tint: Theme.Colors.lava)
+            bannerLabel("Lava rising! Move!", art: nil, tint: Theme.Colors.lava)
+        } else if hud.isOnCrust {
+            bannerLabel("Obsidian crust: score x2", art: Art.HUD.crust, tint: Theme.Colors.ember)
+        } else if hud.hasCrust {
+            // The crust is short-lived, so its hint outranks the ongoing mood banner.
+            bannerLabel("Stand on the crust for x2", art: Art.HUD.crust, tint: Theme.Colors.textPrimary)
         } else if hud.mood != .steady {
-            bannerLabel("\(hud.mood.title) \(Int(hud.moodRemaining.rounded(.up)))s", systemImage: hud.mood.systemImage, tint: Theme.Colors.textPrimary)
+            bannerLabel("\(hud.mood.title) \(Int(hud.moodRemaining.rounded(.up)))s", art: Art.mood(hud.mood), tint: Theme.Colors.textPrimary)
         }
     }
 
-    private func bannerLabel(_ text: String, systemImage: String, tint: Color) -> some View {
-        Label(text, systemImage: systemImage)
+    /// `art: nil` shows the system warning glyph instead of painted art.
+    private func bannerLabel(_ text: String, art: String?, tint: Color) -> some View {
+        Label {
+            Text(text)
+        } icon: {
+            if let art {
+                Image(art)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+            } else {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+        }
             .font(.display(14, weight: .bold))
             .monospacedDigit()
             .foregroundStyle(tint)
             .padding(.vertical, 7)
             .padding(.horizontal, 14)
-            .background(Capsule().fill(.black.opacity(0.45)))
+            .background(NineSlice(piece: Chrome.toast, scale: 0.6))
             .shadow(color: tint.opacity(0.5), radius: 10)
             .transition(.scale(scale: 0.8).combined(with: .opacity))
             .id(text)
